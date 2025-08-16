@@ -9,16 +9,19 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Architecture & Design Principles
 
 ### Core Design Philosophy
+
 - **Stdlib-only core**: No third-party dependencies for core functionality
 - **Deterministic output**: Identical results across runs
 - **Plugin architecture**: Optional enhancements via `--use-plugins`
 - **Clean separation**: Input detection → Processing → Markdown output
 
 ### Supported Input Types
+
 1. **JSON Conversations**: Chat/conversation logs with speaker, timestamp, content
 2. **Website/HTML**: Web pages with content extraction and image handling
 
 ### Key Output Features
+
 - YAML front matter with metadata
 - Deterministic code block handling (extends fence length for nested backticks)
 - Asset management (images saved to `assets/` directory)
@@ -27,6 +30,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Development Commands
 
 ### Setup & Installation
+
 ```bash
 # Install in development mode
 pip install -e .
@@ -36,6 +40,7 @@ pip install -e ".[dev]"
 ```
 
 ### Testing
+
 ```bash
 # Run all tests (project uses unittest, not pytest)
 python -m unittest discover tests/
@@ -48,6 +53,7 @@ python -m unittest discover tests/ -v
 ```
 
 ### Code Quality
+
 ```bash
 # Format code
 black src/ tests/
@@ -60,6 +66,7 @@ black --check src/ tests/
 ```
 
 ### Running the CLI
+
 ```bash
 # Via entry point (after installation)
 conv2md --input <file|url> --out ./output
@@ -88,17 +95,20 @@ docs/features/         # Feature specifications and requirements
 ## Development Guidelines
 
 ### Testing Strategy
+
 - Use unittest with golden fixtures for deterministic output testing
 - Test conversation parsing, HTML extraction, and Markdown generation separately
 - Verify identical output across multiple runs (critical for deterministic guarantee)
 - Focus on edge cases: nested backticks in code, malformed HTML, timezone handling
 
 ### Code Organization
+
 - Keep core functionality in stdlib-only modules
 - Isolate plugin dependencies to prevent core contamination
 - Use clear separation between input detection, processing, and output generation
 
 ### Key Technical Requirements
+
 - Python 3.8+ compatibility (pyproject.toml specifies >=3.8)
 - Deterministic Markdown output (same input produces identical results)
 - Proper handling of code blocks with nested backticks (extends fence length automatically)
@@ -109,6 +119,7 @@ docs/features/         # Feature specifications and requirements
 ## CLI Interface
 
 ### Core Arguments
+
 - `--input <file|url>`: Input source (JSON conversation or website URL)
 - `--out DIR`: Output directory (default: ./out)
 - `--tz TIMEZONE`: Timezone for timestamps (default: America/Phoenix)
@@ -117,5 +128,6 @@ docs/features/         # Feature specifications and requirements
 - `--ignore-robots`: Bypass robots.txt restrictions
 
 ### Future Arguments (from spec)
+
 - `--toc`: Generate table of contents
 - `--use-plugins`: Enable optional plugin features
