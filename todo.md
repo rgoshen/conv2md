@@ -15,7 +15,7 @@
 - [x] Project structure setup per CLAUDE_UNIVERSAL.md
 - [x] Initial architecture design and ADR-001
 - [ ] Core domain models and interfaces
-- [ ] Test infrastructure setup
+- [~] Test infrastructure setup (directory structure established; pending config, CI, and initial test cases)
 
 **Dependencies**: None  
 **Estimate**: M (1-2 days)  
