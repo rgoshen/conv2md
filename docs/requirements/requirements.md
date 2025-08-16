@@ -128,7 +128,7 @@
 ### NF005 - Compatibility
 - **Description**: Cross-platform compatibility
 - **Requirements**:
-  - Python 3.8+ support
+  - Python 3.13+ support
   - Windows, macOS, Linux compatibility
   - Unicode handling for international content
   - Timezone-aware timestamp processing
@@ -233,7 +233,7 @@
 ## Constraints
 
 ### C001 - Technical Constraints
-- Python 3.8+ minimum version
+- Python 3.13+ minimum version
 - Stdlib-only core (no third-party parsing libraries)
 - Must work offline for local files
 - Cross-platform compatibility required
@@ -287,7 +287,7 @@
 ## Assumptions
 
 ### A001 - User Environment
-- Users have Python 3.8+ installed
+- Users have Python 3.13+ installed
 - Users have internet connectivity for web content
 - Users understand basic command-line usage
 

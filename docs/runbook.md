@@ -3,7 +3,7 @@
 ## Development Setup
 
 ### Prerequisites
-- Python 3.8+
+- Python 3.13+
 - Git
 - Virtual environment tools
 
