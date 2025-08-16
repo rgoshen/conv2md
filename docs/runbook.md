@@ -30,6 +30,7 @@ python -m unittest discover tests/ -v
 # Run specific test categories
 python -m unittest discover tests/unit/ -v
 python -m unittest discover tests/integration/ -v
+python -m unittest discover tests/contract/ -v
 
 # Run with coverage (when configured)
 # coverage run -m unittest discover

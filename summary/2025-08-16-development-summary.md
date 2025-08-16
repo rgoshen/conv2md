@@ -135,7 +135,7 @@
 - Updated development summary to reflect all work
 
 ### Future Process Commitments
-- Run `black src/ tests/` and `flake8 src/ tests/` before every commit
+- Run `black src/ tests/` and `flake8 src/ tests/ --max-line-length=88` before every commit
 - Update daily summary with each commit or significant change
 - Verify Definition of Done checklist completion before pushing
 - Maintain consistent documentation updates

@@ -155,6 +155,7 @@ python -m unittest discover tests/ -v
 # Run specific test types
 python -m unittest discover tests/unit/ -v
 python -m unittest discover tests/integration/ -v
+python -m unittest discover tests/contract/ -v
 ```
 
 ### Code Quality
@@ -163,7 +164,7 @@ python -m unittest discover tests/integration/ -v
 black src/ tests/
 
 # Lint code  
-flake8 src/ tests/
+flake8 src/ tests/ --max-line-length=88
 
 # Security scan
 bandit -r src/

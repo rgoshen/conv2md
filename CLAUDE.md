@@ -457,7 +457,7 @@ bash
 
 # Plugin tests (requires plugin dependencies)
 
-python -m unittest tests.plugins/ -v
+python -m unittest discover tests/contract/ -v
 
 # Test core functionality without plugins
 
