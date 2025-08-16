@@ -13,7 +13,7 @@
 
 - [x] Requirements gathering and documentation
 - [x] Project structure setup per CLAUDE_UNIVERSAL.md
-- [ ] Initial architecture design and ADR-001
+- [x] Initial architecture design and ADR-001
 - [ ] Core domain models and interfaces
 - [ ] Test infrastructure setup
 
