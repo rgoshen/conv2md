@@ -23,6 +23,8 @@ It preserves structure, code blocks, and assets while adding useful metadata for
 - Add **YAML front matter** with metadata (title, source, participants, timestamps, counts)
 - Deterministic output (identical across runs given the same input)
 
+*For complete feature specifications, see [CONV2MD_FEATURES.md](docs/features/CONV2MD_FEATURES.md)*
+
 ---
 
 ## 🚀 Philosophy
@@ -33,6 +35,8 @@ It preserves structure, code blocks, and assets while adding useful metadata for
   - Time handling via `datetime` and `zoneinfo`
 - **Reproducible**: Same input → same Markdown every time.
 - **Pluggable**: Optional `--use-plugins` flag enables extra features (LLM summaries, OCR, readability libraries).
+
+*See [Architecture Overview](docs/architecture/overview.md) for detailed design principles.*
 
 ---
 
@@ -175,6 +179,19 @@ We follow strict TDD and security-first development. See [CONTRIBUTING.md](CONTR
 
 ---
 
+## 📚 Documentation
+
+- **[Requirements](docs/requirements/requirements.md)** - Comprehensive functional and non-functional requirements
+- **[Architecture Overview](docs/architecture/overview.md)** - System design and architecture decisions  
+- **[ADR-001: Core Architecture](docs/decisions/ADR-001-core-architecture.md)** - Hexagonal architecture decision
+- **[Features Specification](docs/features/CONV2MD_FEATURES.md)** - Detailed feature requirements and tech stack
+- **[Development Runbook](docs/runbook.md)** - Operations and troubleshooting guide
+- **[Task Planning](todo.md)** - Current development tasks and milestones
+- **[Contributing Guidelines](CONTRIBUTING.md)** - Development workflow and standards
+- **[Daily Summaries](summary/)** - Development progress tracking
+
+---
+
 ## 📜 License
 
-MIT
+[MIT](LICENSE)
