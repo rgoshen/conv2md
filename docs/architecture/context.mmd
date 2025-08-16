@@ -1,0 +1,33 @@
+graph TB
+    subgraph "External Systems"
+        JSON[JSON Files]
+        WEB[Websites/URLs]
+        FS[File System]
+        NET[Network/HTTP]
+    end
+    
+    subgraph "conv2md System"
+        CLI[CLI Interface]
+        CORE[Core Conversion Engine]
+        PLUGINS[Plugin System]
+    end
+    
+    subgraph "Output"
+        MD[Markdown Files]
+        ASSETS[Image Assets]
+    end
+    
+    JSON --> CLI
+    WEB --> CLI
+    CLI --> CORE
+    CORE --> PLUGINS
+    CORE --> MD
+    CORE --> ASSETS
+    CORE --> FS
+    CLI --> NET
+    
+    style CLI fill:#e1f5fe
+    style CORE fill:#f3e5f5
+    style PLUGINS fill:#fff3e0
+    style MD fill:#e8f5e8
+    style ASSETS fill:#e8f5e8
