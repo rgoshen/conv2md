@@ -9,7 +9,7 @@ def validate_input(ctx, param, value):
     # Pass through URLs untouched
     if value.startswith(("http://", "https://")):
         return value
-    
+
     # Use click.Path for file validation
     try:
         # Let click.Path handle exists=True, resolve_path=True, readable, etc.
@@ -33,17 +33,17 @@ def validate_input(ctx, param, value):
 
 @click.command()
 @click.option(
-    '--input', 
-    required=True, 
+    "--input",
+    required=True,
     callback=validate_input,
-    help='Input file or URL to convert'
+    help="Input file or URL to convert",
 )
 @click.option(
-    '--out', 
-    default='./out',
+    "--out",
+    default="./out",
     show_default=True,
     type=click.Path(file_okay=False, dir_okay=True, writable=True),
-    help='Output directory'
+    help="Output directory",
 )
 @click.version_option()
 def main(input, out):
@@ -56,7 +56,7 @@ def main(input, out):
         conv2md --input conversation.json --out ./output
         conv2md --input https://example.com/article --out ./docs
         conv2md --input transcript.json
-    
+
     This is the foundation CLI interface. Full functionality will be implemented
     in Milestone 1 development phase.
     """
