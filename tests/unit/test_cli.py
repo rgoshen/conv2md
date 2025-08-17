@@ -35,7 +35,7 @@ class TestCLIArgumentParsing(unittest.TestCase):
         self.assertNotEqual(result.exit_code, 2, "CLI should accept --input argument")
 
     def test_cli_accepts_http_url_input(self):
-        """Test CLI accepts a valid HTTP(S) URL as --input argument without file-related error."""
+        """Test CLI accepts HTTP(S) URL as --input without file-related error."""
         url = "https://example.com/test.json"
         result = self.runner.invoke(main, ["--input", url])
 
