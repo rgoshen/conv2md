@@ -15,6 +15,12 @@ jobs:
         with:
           fetch-depth: 0  # Fetch full history for proper comparison
           
+      - name: Install GitHub CLI
+        run: |
+          # GitHub CLI is pre-installed on GitHub runners, but ensure it's available
+          which gh || (echo "GitHub CLI not found" && exit 1)
+          gh --version
+          
       - name: Check if PR already exists
         id: check-pr
         run: |
