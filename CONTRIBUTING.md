@@ -90,16 +90,29 @@ All contributors are expected to follow the Code of Conduct (CODE_OF_CONDUCT.md)
 2. Install dependencies:
 
     ```bash
-    <package-manager> install
+    # Install with development dependencies
+    pip install -e ".[dev,plugins]"
+    
+    # Install pre-commit hooks
+    pip install pre-commit
+    pre-commit install
     ```
 
-3. Copy `.env.example` to `.env` and fill in your local settings.
+3. Verify setup:
+
+    ```bash
+    # Run tests to ensure everything works
+    python -m unittest discover tests/ -v
+    
+    # Check pre-commit setup
+    pre-commit run --all-files
+    ```
 
 ## Reporting Issues
 
 - Search existing issues before opening a new one.
 
-- Use the issue template, if available.
+- Use the provided issue templates (bug report or feature request).
 
 - Include steps to reproduce, expected vs actual behavior, and environment details.
 

@@ -145,12 +145,17 @@ source .venv/bin/activate
 
 # Install with all dependencies
 pip install -e ".[dev,plugins]"
+
+# Install pre-commit hooks (recommended)
+pip install pre-commit
+pre-commit install
 ```
 
 ### Running Tests
 ```bash
-# Run all tests
-python -m unittest discover tests/ -v
+# Run all tests with coverage
+coverage run -m unittest discover tests/ -v
+coverage report --show-missing
 
 # Run specific test types
 python -m unittest discover tests/unit/ -v
@@ -160,22 +165,24 @@ python -m unittest discover tests/contract/ -v
 
 ### Code Quality
 ```bash
-# Format code
-black src/ tests/
+# Run pre-commit on all files
+pre-commit run --all-files
 
-# Lint code  
-flake8 src/ tests/ --max-line-length=88
-
-# Security scan
-bandit -r src/
+# Individual tools (if not using pre-commit)
+black src/ tests/              # Code formatting
+flake8 src/ tests/ --max-line-length=88  # Linting
+bandit -r src/                 # Security scan
+mypy src/conv2md/              # Type checking
 ```
 
 ### Contributing
 We follow strict TDD and security-first development. See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
 
-- Create feature branches from `main`
+- Create feature branches from `develop`
 - Follow conventional commit format
-- Ensure all CI checks pass
+- Use pre-commit hooks for quality assurance
+- Ensure all CI checks pass (including CodeQL security analysis)
+- Maintain 90%+ test coverage
 - Update documentation as needed
 
 ---
