@@ -133,9 +133,9 @@ class TestJSONConverter(unittest.TestCase):
 
     def test_parse_whitespace_only_speaker_raises_error(self):
         """Test that whitespace-only speaker raises validation error."""
-        whitespace_speaker_json = json.dumps({
-            "messages": [{"speaker": "   ", "content": "Hello"}]  # Whitespace only
-        })
+        whitespace_speaker_json = json.dumps(
+            {"messages": [{"speaker": "   ", "content": "Hello"}]}  # Whitespace only
+        )
 
         with self.assertRaises(ConversationParseError) as cm:
             self.converter.parse(whitespace_speaker_json)

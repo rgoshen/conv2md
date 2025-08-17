@@ -104,13 +104,13 @@ class TestMarkdownGenerator(unittest.TestCase):
         # Create conversation with empty content
         messages = [Message(speaker="User", content="")]
         conversation = Conversation(messages=messages)
-        
+
         result = self.generator.generate(conversation)
-        
+
         # Should still format properly with empty content
         self.assertIn("**User:**", result)
         # Content after colon should be empty (just the space)
-        lines = result.split('\n')
+        lines = result.split("\n")
         user_line = next(line for line in lines if line.startswith("**User:**"))
         self.assertEqual(user_line, "**User:** ")
 
@@ -118,9 +118,9 @@ class TestMarkdownGenerator(unittest.TestCase):
         """Test generation with only one message."""
         messages = [Message(speaker="Bot", content="Solo message")]
         conversation = Conversation(messages=messages)
-        
+
         result = self.generator.generate(conversation)
-        
+
         # Should have no trailing newlines for single message
         self.assertEqual(result, "**Bot:** Solo message")
         self.assertNotIn("\n\n", result)
