@@ -11,6 +11,14 @@ from pathlib import Path
 def main(input, out):
     """conv2md: Convert conversations, transcripts, and websites to Markdown.
 
+    Supports JSON conversations, websites, and HTML files with deterministic
+    output and comprehensive security validation.
+
+    Examples:
+        conv2md --input conversation.json --out ./output
+        conv2md --input https://example.com/article --out ./docs
+        conv2md --input transcript.json
+    
     This is the foundation CLI interface. Full functionality will be implemented
     in Milestone 1 development phase.
     """

@@ -27,7 +27,7 @@
 - [x] Error handling: Input validation and user-friendly error messages
 - [x] Security: Path sanitization and input validation
 - [x] Tests: CLI argument parsing and validation tests
-- [ ] Docs: CLI usage documentation
+- [x] Docs: CLI usage documentation
 
 **Dependencies**: Project Foundation
 **Estimate**: S (half-day)
