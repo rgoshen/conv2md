@@ -131,6 +131,17 @@ class TestJSONConverter(unittest.TestCase):
 
         self.assertIn("speaker cannot be empty", str(cm.exception).lower())
 
+    def test_parse_whitespace_only_speaker_raises_error(self):
+        """Test that whitespace-only speaker raises validation error."""
+        whitespace_speaker_json = json.dumps({
+            "messages": [{"speaker": "   ", "content": "Hello"}]  # Whitespace only
+        })
+
+        with self.assertRaises(ConversationParseError) as cm:
+            self.converter.parse(whitespace_speaker_json)
+
+        self.assertIn("speaker cannot be empty", str(cm.exception).lower())
+
     def test_parse_logs_conversion_steps(self):
         """Test that parsing logs conversion steps for observability."""
         minimal_json = {

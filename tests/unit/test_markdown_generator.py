@@ -53,14 +53,8 @@ class TestMarkdownGenerator(unittest.TestCase):
         self.assertIn("title: Test Conversation", result)
         self.assertIn("source: test.json", result)
 
-        # Find closing frontmatter
-        closing_index = None
-        for i, line in enumerate(lines[1:], 1):
-            if line == "---":
-                closing_index = i
-                break
-
-        self.assertIsNotNone(closing_index, "Should have closing --- for frontmatter")
+        # Verify closing frontmatter exists
+        self.assertIn("---", lines[1:], "Should have closing --- for frontmatter")
         self.assertIn("**User:**", result)
 
     def test_generate_escapes_markdown_characters(self):
@@ -104,6 +98,32 @@ class TestMarkdownGenerator(unittest.TestCase):
         )
         self.assertIn("tags: value with\\: colon", result)
         self.assertIn("injection: \\- list item\\n  nested\\: value", result)
+
+    def test_generate_handles_empty_content(self):
+        """Test that empty content is handled properly."""
+        # Create conversation with empty content
+        messages = [Message(speaker="User", content="")]
+        conversation = Conversation(messages=messages)
+        
+        result = self.generator.generate(conversation)
+        
+        # Should still format properly with empty content
+        self.assertIn("**User:**", result)
+        # Content after colon should be empty (just the space)
+        lines = result.split('\n')
+        user_line = next(line for line in lines if line.startswith("**User:**"))
+        self.assertEqual(user_line, "**User:** ")
+
+    def test_generate_handles_single_message(self):
+        """Test generation with only one message."""
+        messages = [Message(speaker="Bot", content="Solo message")]
+        conversation = Conversation(messages=messages)
+        
+        result = self.generator.generate(conversation)
+        
+        # Should have no trailing newlines for single message
+        self.assertEqual(result, "**Bot:** Solo message")
+        self.assertNotIn("\n\n", result)
 
 
 if __name__ == "__main__":
