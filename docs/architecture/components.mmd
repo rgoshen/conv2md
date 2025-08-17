@@ -1,0 +1,70 @@
+graph TB
+    subgraph "Domain Layer"
+        CONV[Conversation Entity]
+        DOC[Document Entity]
+        IMG_ENT[Image Entity]
+        TS[Timestamp VO]
+        URL_VO[URL VO]
+        HASH[ContentHash VO]
+        MD_SVC[Markdown Service]
+        VALID_SVC[Validation Service]
+    end
+    
+    subgraph "Application Layer"
+        CONV_UC[Convert Conversation]
+        WEB_UC[Convert Website]
+        BATCH_UC[Batch Process]
+    end
+    
+    subgraph "Ports"
+        FETCH_PORT[Content Fetcher]
+        PARSE_PORT[Content Parser]
+        STORE_PORT[Storage]
+        GEN_PORT[Generator]
+    end
+    
+    subgraph "Adapters"
+        subgraph "Stdlib Adapters"
+            URLLIB[urllib HTTP]
+            HTML_PARSER[html.parser]
+            PATHLIB[pathlib Storage]
+            JSON_PARSER[json Parser]
+        end
+        
+        subgraph "Plugin Adapters"
+            REQUESTS[requests HTTP]
+            BS4[BeautifulSoup]
+            ENHANCED_STORAGE[Enhanced Storage]
+        end
+    end
+    
+    CONV_UC --> CONV
+    CONV_UC --> MD_SVC
+    WEB_UC --> DOC
+    WEB_UC --> VALID_SVC
+    
+    CONV_UC --> FETCH_PORT
+    CONV_UC --> STORE_PORT
+    WEB_UC --> PARSE_PORT
+    WEB_UC --> GEN_PORT
+    
+    FETCH_PORT --> URLLIB
+    FETCH_PORT --> REQUESTS
+    PARSE_PORT --> HTML_PARSER
+    PARSE_PORT --> BS4
+    STORE_PORT --> PATHLIB
+    STORE_PORT --> ENHANCED_STORAGE
+    
+    CONV --> TS
+    CONV --> HASH
+    DOC --> URL_VO
+    DOC --> IMG_ENT
+    
+    style CONV_UC fill:#f3e5f5
+    style WEB_UC fill:#f3e5f5
+    style CONV fill:#e8f5e8
+    style DOC fill:#e8f5e8
+    style URLLIB fill:#bbdefb
+    style HTML_PARSER fill:#bbdefb
+    style REQUESTS fill:#ffe0b2
+    style BS4 fill:#ffe0b2
