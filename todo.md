@@ -35,13 +35,13 @@
 
 ### Feature: JSON Conversation Processing (P0) - F002
 
-- [ ] Core behavior: Parse minimal JSON schema and convert to Markdown
-- [ ] Error handling: Malformed JSON, missing fields, invalid timestamps
-- [ ] Integration points: File I/O adapter, Markdown generator interface
-- [ ] Security controls: JSON parsing safety, content sanitization
-- [ ] Observability: Logging for parse errors and conversion steps
-- [ ] Testing strategy: Unit tests + golden fixtures for determinism
-- [ ] Documentation: JSON schema specification
+- [x] Core behavior: Parse minimal JSON schema and convert to Markdown
+- [x] Error handling: Malformed JSON, missing fields, invalid timestamps
+- [x] Integration points: File I/O adapter, Markdown generator interface
+- [x] Security controls: JSON parsing safety, content sanitization
+- [x] Observability: Logging for parse errors and conversion steps
+- [x] Testing strategy: Unit tests + golden fixtures for determinism
+- [x] Documentation: JSON schema specification
 
 **Dependencies**: CLI Interface, Core Domain Models
 **Estimate**: L (3-5 days)
