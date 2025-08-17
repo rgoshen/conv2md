@@ -27,12 +27,26 @@ class MarkdownGenerator:
 
         lines = []
 
+        def escape_yaml_value(value):
+            """Escape YAML special characters to prevent injection."""
+            # Convert to string and escape YAML special characters
+            str_value = str(value)
+            # Escape key YAML characters: : " \ newlines, list markers
+            str_value = str_value.replace("\\", "\\\\")  # Escape backslashes first
+            str_value = str_value.replace(":", "\\:")
+            str_value = str_value.replace('"', '\\"')
+            str_value = str_value.replace("\n", "\\n")
+            str_value = str_value.replace("\r", "\\r")
+            str_value = str_value.replace("-", "\\-")  # Prevent list interpretation
+            return str_value
+
         # Add YAML frontmatter if metadata provided
         if metadata:
             logger.debug(f"Adding YAML frontmatter with {len(metadata)} fields")
             lines.append("---")
             for key, value in metadata.items():
-                lines.append(f"{key}: {value}")
+                escaped_value = escape_yaml_value(value)
+                lines.append(f"{key}: {escaped_value}")
             lines.append("---")
             lines.append("")  # Blank line after frontmatter
 

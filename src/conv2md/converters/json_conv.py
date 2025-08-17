@@ -29,6 +29,15 @@ class JSONConverter:
             logger.error(f"Validation error: {error_msg}")
             raise ConversationParseError(error_msg)
 
+    def _validate_non_empty_string(
+        self, value: str, field_name: str, message_index: int
+    ):
+        """Validate that a string field is not empty."""
+        if not value.strip():
+            error_msg = f"Message {message_index}: {field_name} cannot be empty"
+            logger.error(f"Validation error: {error_msg}")
+            raise ConversationParseError(error_msg)
+
     def parse(self, json_string: str) -> Conversation:
         """Parse JSON string to Conversation object.
 
@@ -78,6 +87,9 @@ class JSONConverter:
             # NOTE: Could be simplified with pydantic in future plugin architecture
             self._validate_field_type(speaker, "speaker", str, i)
             self._validate_field_type(content, "content", str, i)
+
+            # Validate non-empty strings
+            self._validate_non_empty_string(speaker, "speaker", i)
 
             message = Message(speaker=speaker, content=content)
             messages.append(message)

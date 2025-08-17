@@ -81,6 +81,30 @@ class TestMarkdownGenerator(unittest.TestCase):
         self.assertIn("Bot\\[link\\]", result)
         self.assertIn("Text with \\# heading and \\*\\*bold\\*\\*", result)
 
+    def test_generate_escapes_yaml_frontmatter_injection(self):
+        """Test that YAML special characters in metadata are escaped."""
+        # Create conversation with metadata containing YAML special characters
+        messages = [Message(speaker="User", content="Test")]
+        conversation = Conversation(messages=messages)
+
+        # Metadata with YAML injection attempts
+        metadata = {
+            "title": "Test: malicious content",
+            "description": 'Contains "quotes" and newlines\nSecond line',
+            "tags": "value with: colon",
+            "injection": "- list item\n  nested: value",
+        }
+
+        result = self.generator.generate(conversation, metadata=metadata)
+
+        # Verify YAML special characters are handled safely
+        self.assertIn("title: Test\\: malicious content", result)
+        self.assertIn(
+            'description: Contains \\"quotes\\" and newlines\\nSecond line', result
+        )
+        self.assertIn("tags: value with\\: colon", result)
+        self.assertIn("injection: \\- list item\\n  nested\\: value", result)
+
 
 if __name__ == "__main__":
     unittest.main()

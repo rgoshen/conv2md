@@ -120,6 +120,17 @@ class TestJSONConverter(unittest.TestCase):
 
         self.assertIn("speaker must be str", str(cm.exception).lower())
 
+    def test_parse_empty_speaker_raises_error(self):
+        """Test that empty speaker string raises validation error."""
+        empty_speaker_json = json.dumps(
+            {"messages": [{"speaker": "", "content": "Hello"}]}  # Empty speaker
+        )
+
+        with self.assertRaises(ConversationParseError) as cm:
+            self.converter.parse(empty_speaker_json)
+
+        self.assertIn("speaker cannot be empty", str(cm.exception).lower())
+
     def test_parse_logs_conversion_steps(self):
         """Test that parsing logs conversion steps for observability."""
         minimal_json = {
