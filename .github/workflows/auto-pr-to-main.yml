@@ -1,0 +1,110 @@
+name: Auto PR to Main
+
+on:
+  push:
+    branches: [develop]
+  workflow_dispatch:  # Allow manual triggering
+
+jobs:
+  create-pr:
+    name: 'Create PR from develop to main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch full history for proper comparison
+          
+      - name: Check if PR already exists
+        id: check-pr
+        run: |
+          # Check if there's already an open PR from develop to main
+          EXISTING_PR=$(gh pr list --base main --head develop --state open --json number --jq '.[0].number')
+          if [ "$EXISTING_PR" != "null" ] && [ -n "$EXISTING_PR" ]; then
+            echo "existing_pr=$EXISTING_PR" >> $GITHUB_OUTPUT
+            echo "PR already exists: #$EXISTING_PR"
+          else
+            echo "existing_pr=" >> $GITHUB_OUTPUT
+            echo "No existing PR found"
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: Get commit differences
+        id: changes
+        if: steps.check-pr.outputs.existing_pr == ''
+        run: |
+          # Get commits that are in develop but not in main
+          COMMITS=$(git log main..develop --oneline --no-merges | head -20)
+          if [ -z "$COMMITS" ]; then
+            echo "No new commits to merge"
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+          else
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+            echo "Found commits to merge:"
+            echo "$COMMITS"
+            
+            # Create PR body with commit list
+            cat > pr_body.md << 'EOF'
+## 🚀 Automated PR: develop → main
+
+This PR contains the latest stable changes from the `develop` branch ready for production.
+
+### 📋 Changes Included
+
+EOF
+            echo "$COMMITS" | while read line; do
+              echo "- $line" >> pr_body.md
+            done
+            
+            cat >> pr_body.md << 'EOF'
+
+### ✅ Pre-merge Checklist
+
+- [ ] All CI checks passing
+- [ ] Code review completed
+- [ ] Documentation updated if needed
+- [ ] Breaking changes documented
+- [ ] Security considerations reviewed
+
+### 🔍 Review Instructions
+
+Please verify:
+1. All feature branches have been properly tested
+2. No breaking changes without proper versioning
+3. All security scans are clean
+4. Documentation is up to date
+
+---
+
+*This PR was automatically created when changes were pushed to `develop`.*
+EOF
+          fi
+          
+      - name: Create Pull Request
+        if: steps.check-pr.outputs.existing_pr == '' && steps.changes.outputs.has_changes == 'true'
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          base: main
+          head: develop
+          title: "🚀 Release: Merge develop to main"
+          body-path: pr_body.md
+          labels: |
+            automated
+            release
+          assignees: ${{ github.actor }}
+          reviewers: ${{ github.actor }}
+          
+      - name: Update existing PR
+        if: steps.check-pr.outputs.existing_pr != ''
+        run: |
+          echo "Updating existing PR #${{ steps.check-pr.outputs.existing_pr }}"
+          gh pr comment ${{ steps.check-pr.outputs.existing_pr }} --body "🔄 Updated with latest changes from develop branch ($(git rev-parse --short HEAD))"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: No changes to merge
+        if: steps.changes.outputs.has_changes == 'false'
+        run: |
+          echo "✅ develop branch is in sync with main - no PR needed"
