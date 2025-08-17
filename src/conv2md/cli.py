@@ -4,7 +4,7 @@ import click
 
 
 @click.command()
-@click.option('--input', help='Input file or URL to convert')
+@click.option('--input', required=True, help='Input file or URL to convert')
 @click.option('--out', default='./out', help='Output directory (default: ./out)')
 @click.version_option()
 def main(input, out):
