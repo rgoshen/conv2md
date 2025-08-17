@@ -52,18 +52,32 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -e ".[dev]"
+          pip install coverage
           
-      - name: Run unit tests
+      - name: Run unit tests with coverage
         run: |
-          python -m unittest discover tests/unit/ -v
+          coverage run --source=src/conv2md -m unittest discover tests/unit/ -v
           
-      - name: Run integration tests
+      - name: Run integration tests with coverage
         run: |
-          python -m unittest discover tests/integration/ -v
+          coverage run --append --source=src/conv2md -m unittest discover tests/integration/ -v
           
-      - name: Run contract tests
+      - name: Run contract tests with coverage
         run: |
-          python -m unittest discover tests/contract/ -v
+          coverage run --append --source=src/conv2md -m unittest discover tests/contract/ -v
+          
+      - name: Generate coverage report
+        run: |
+          coverage report --show-missing --fail-under=90
+          coverage xml
+          
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage.xml
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: false
 
   security-scans:
     name: 'Security Scans'
