@@ -1,0 +1,51 @@
+graph TB
+    subgraph "CLI Container"
+        CLICK[Click CLI Framework]
+        ARGS[Argument Parser]
+        VALID[Input Validator]
+    end
+    
+    subgraph "Core Container"
+        UC[Use Cases]
+        DOMAIN[Domain Services]
+        ENTITIES[Entities & Value Objects]
+    end
+    
+    subgraph "Adapter Container"
+        HTTP[HTTP Client]
+        FILE[File System]
+        PARSER[HTML Parser]
+        IMG[Image Processor]
+    end
+    
+    subgraph "Port Container"
+        IHTTP[HTTP Port]
+        IFILE[File Port]
+        IPARSE[Parser Port]
+        IIMG[Image Port]
+    end
+    
+    CLICK --> ARGS
+    ARGS --> VALID
+    VALID --> UC
+    UC --> DOMAIN
+    DOMAIN --> ENTITIES
+    
+    UC --> IHTTP
+    UC --> IFILE
+    UC --> IPARSE
+    UC --> IIMG
+    
+    IHTTP --> HTTP
+    IFILE --> FILE
+    IPARSE --> PARSER
+    IIMG --> IMG
+    
+    style CLICK fill:#e1f5fe
+    style UC fill:#f3e5f5
+    style DOMAIN fill:#f3e5f5
+    style ENTITIES fill:#f3e5f5
+    style HTTP fill:#fff3e0
+    style FILE fill:#fff3e0
+    style PARSER fill:#fff3e0
+    style IMG fill:#fff3e0

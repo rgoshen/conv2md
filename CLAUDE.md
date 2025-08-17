@@ -425,7 +425,7 @@ bash
 # Verify correct Python environment
 
 which python # Should show .venv/bin/python
-python --version # Should show Python 3.8+
+python --version # Should show Python 3.13+
 
 # Verify installation
 
@@ -457,7 +457,7 @@ bash
 
 # Plugin tests (requires plugin dependencies)
 
-python -m unittest tests.plugins/ -v
+python -m unittest discover tests/contract/ -v
 
 # Test core functionality without plugins
 
