@@ -5,8 +5,9 @@ import click
 
 @click.command()
 @click.option('--input', help='Input file or URL to convert')
+@click.option('--out', default='./out', help='Output directory (default: ./out)')
 @click.version_option()
-def main(input):
+def main(input, out):
     """conv2md: Convert conversations, transcripts, and websites to Markdown.
 
     This is the foundation CLI interface. Full functionality will be implemented

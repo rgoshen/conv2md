@@ -21,6 +21,17 @@ class TestCLIArgumentParsing(unittest.TestCase):
         self.assertNotEqual(result.exit_code, 2, 
                            "CLI should accept --input argument")
 
+    def test_cli_accepts_out_argument(self):
+        """Test CLI accepts --out argument without error."""
+        result = self.runner.invoke(main, [
+            '--input', 'test.json',
+            '--out', './output'
+        ])
+        
+        # Should not exit with usage error (exit code 2)
+        self.assertNotEqual(result.exit_code, 2,
+                           "CLI should accept --out argument")
+
 
 if __name__ == "__main__":
     unittest.main()
