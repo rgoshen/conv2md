@@ -24,9 +24,9 @@
 ### Feature: CLI Interface (P0) - F001
 
 - [x] Core behavior: Argument parsing with click framework
-- [~] Error handling: Input validation and user-friendly error messages
-- [ ] Security: Path sanitization and input validation
-- [~] Tests: CLI argument parsing and validation tests
+- [x] Error handling: Input validation and user-friendly error messages
+- [x] Security: Path sanitization and input validation
+- [x] Tests: CLI argument parsing and validation tests
 - [ ] Docs: CLI usage documentation
 
 **Dependencies**: Project Foundation

@@ -17,6 +17,17 @@ def main(input, out):
     # Validate input file exists (if not URL)
     if not input.startswith(('http://', 'https://')):
         input_path = Path(input)
+        
+        # Security: Prevent path traversal attacks
+        try:
+            resolved_path = input_path.resolve()
+            if '..' in input_path.parts:
+                click.echo(f"Error: Invalid path traversal detected in '{input}'", err=True)
+                raise click.Abort()
+        except (OSError, ValueError):
+            click.echo(f"Error: Invalid path '{input}'", err=True)
+            raise click.Abort()
+        
         if not input_path.exists():
             click.echo(f"Error: Input file '{input}' not found", err=True)
             raise click.Abort()
