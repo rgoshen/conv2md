@@ -64,8 +64,43 @@ The Project Foundation feature is now complete according to CLAUDE_WORKFLOW.md r
 - All layers properly separated (domain, application, ports, adapters)
 - Plugin architecture foundation in place per CLAUDE.md requirements
 
+## DevOps Improvements Added
+
+### Security & Quality Enhancements
+- **Dependabot**: Automated weekly dependency updates targeting develop branch
+- **CodeQL**: Advanced security analysis on push, PR, and scheduled runs
+- **Pre-commit hooks**: Comprehensive validation (formatting, linting, security, tests)
+- **Test coverage**: 90% threshold with Codecov integration
+
+### Developer Experience
+- **Issue templates**: Bug reports and feature requests with security checklists
+- **PR template**: Comprehensive validation including TDD compliance
+- **Auto-PR workflow**: develop → main with proper review gates
+- **Documentation updates**: README and CONTRIBUTING updated for new tooling
+
+### Process Automation
+- **Quality gates**: Cannot merge without passing all security and quality checks
+- **Dependency tracking**: Automatic vulnerability detection and updates
+- **Workflow standardization**: All changes follow CLAUDE_WORKFLOW.md principles
+
+## Code Review Feedback Addressed
+
+### Security & Performance Fixes
+- **GitHub CLI installation**: Added verification step to auto-PR workflow
+- **CI caching**: Added pip dependency caching for faster builds
+- **Action pinning**: Pinned codecov-action to commit SHA (ab904c41d6ece82784817410c45d8b8c02684457)
+- **Template optimization**: Simplified PR template to reduce reviewer fatigue
+
+### Template Improvements
+- **Streamlined PR template**: Reduced from 80+ checkboxes to essential core checklist
+- **Expandable sections**: Detailed checklists available but collapsed by default
+- **Visual improvements**: Added emojis and better organization
+
 ## Links
 
 - **Related ADR**: [ADR-001: Core Architecture](docs/decisions/ADR-001-core-architecture.md)
 - **Feature Tracker**: `todo.md` - Project Foundation section
 - **CI Pipeline**: `.github/workflows/ci.yml`
+- **Security Analysis**: `.github/workflows/codeql.yml`
+- **Auto-PR Workflow**: `.github/workflows/auto-pr-to-main.yml`
+- **Pre-commit Config**: `.pre-commit-config.yaml`

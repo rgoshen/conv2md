@@ -4,52 +4,63 @@
 <!-- Provide a brief description of the changes in this PR -->
 
 ## Type of Change
-<!-- Mark the relevant option with an "x" -->
-- [ ] Bug fix (non-breaking change which fixes an issue)
-- [ ] New feature (non-breaking change which adds functionality)
-- [ ] Breaking change (fix or feature that would cause existing functionality to not work as expected)
-- [ ] Documentation update
-- [ ] Code refactoring
-- [ ] Test improvements
+- [ ] 🐛 Bug fix
+- [ ] ✨ New feature  
+- [ ] 💥 Breaking change
+- [ ] 📝 Documentation
+- [ ] 🔧 DevOps/CI
+- [ ] ♻️ Refactoring
+
+## Core Checklist
+### Requirements & Testing
+- [ ] All requirement tasks complete (for feature PRs)
+- [ ] Tests pass locally and meet 90% coverage threshold
+- [ ] TDD approach followed (tests written first)
+- [ ] Manual testing completed
+
+### Security & Quality
+- [ ] Input validation for external inputs
+- [ ] No secrets or sensitive data in code
+- [ ] Code follows standards (Black, flake8, TDD)
+- [ ] Self-review completed
+
+### Documentation & Process  
+- [ ] Documentation updated (ADRs, requirements, daily summary)
+- [ ] All CI checks pass (including CodeQL security analysis)
+- [ ] Related issues linked below
 
 ## Changes Made
-<!-- List the specific changes made in this PR -->
+<!-- List the specific changes -->
 -
 -
 -
-
-## Testing
-<!-- Describe how you tested these changes -->
-- [ ] Unit tests pass
-- [ ] Integration tests pass
-- [ ] Manual testing completed
-- [ ] Security validation performed
-
-## Security Considerations
-<!-- For CS-305 checksum verification system -->
-- [ ] Only secure cryptographic algorithms used (SHA-256, SHA-3-256, SHA-512, SHA-3-512)
-- [ ] No deprecated algorithms (MD5, SHA-1) introduced
-- [ ] Input validation implemented
-- [ ] Error handling doesn't expose sensitive information
-- [ ] SSL/TLS configuration maintained
-
-## Checklist
-<!-- Mark completed items with an "x" -->
-- [ ] Code follows project coding standards
-- [ ] Self-review of code completed
-- [ ] Code is properly commented
-- [ ] Tests added/updated for new functionality
-- [ ] Documentation updated if necessary
-- [ ] No merge conflicts
-- [ ] All CI checks pass
 
 ## Related Issues
-<!-- Link any related issues -->
 Closes #
 Relates to #
 
-## Screenshots (if applicable)
-<!-- Add screenshots to help explain your changes -->
-
 ## Additional Notes
-<!-- Any additional information that reviewers should know -->
+<!-- Any other information for reviewers -->
+
+---
+
+<details>
+<summary>📋 Detailed Checklists (expand if needed)</summary>
+
+### Security Deep Dive
+- [ ] OWASP Top 10 considerations addressed
+- [ ] Dependencies verified and documented  
+- [ ] Error handling doesn't expose internals
+- [ ] Output encoding/escaping applied
+
+### TDD Compliance
+- [ ] Red-Green-Refactor cycle followed
+- [ ] No production code without tests
+- [ ] All code written to make failing tests pass
+
+### Documentation Updates
+- [ ] ADRs for significant technical decisions
+- [ ] API documentation if applicable
+- [ ] Architecture diagrams if structure changed
+
+</details>
