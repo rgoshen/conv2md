@@ -17,6 +17,18 @@ class ConversationParseError(Exception):
 class JSONConverter:
     """Converts JSON conversations to structured conversation objects."""
 
+    def _validate_field_type(
+        self, value, field_name: str, expected_type: type, message_index: int
+    ):
+        """Validate that a field has the expected type."""
+        if not isinstance(value, expected_type):
+            error_msg = (
+                f"Message {message_index}: {field_name} must be "
+                f"{expected_type.__name__}, got {type(value).__name__}"
+            )
+            logger.error(f"Validation error: {error_msg}")
+            raise ConversationParseError(error_msg)
+
     def parse(self, json_string: str) -> Conversation:
         """Parse JSON string to Conversation object.
 
@@ -53,7 +65,7 @@ class JSONConverter:
 
         messages = []
         for i, msg_data in enumerate(data["messages"]):
-            # Validate message content types
+            # Validate message fields exist and have correct types
             try:
                 speaker = msg_data["speaker"]
                 content = msg_data["content"]
@@ -62,13 +74,10 @@ class JSONConverter:
                 logger.error(f"Message {i} missing required field: {e}")
                 raise
 
-            if not isinstance(content, str):
-                error_msg = (
-                    f"Message {i}: content must be string, "
-                    f"got {type(content).__name__}"
-                )
-                logger.error(f"Validation error: {error_msg}")
-                raise ConversationParseError(error_msg)
+            # Validate field types (stdlib-only approach)
+            # NOTE: Could be simplified with pydantic in future plugin architecture
+            self._validate_field_type(speaker, "speaker", str, i)
+            self._validate_field_type(content, "content", str, i)
 
             message = Message(speaker=speaker, content=content)
             messages.append(message)

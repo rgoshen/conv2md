@@ -102,7 +102,23 @@ class TestJSONConverter(unittest.TestCase):
         with self.assertRaises(ConversationParseError) as cm:
             self.converter.parse(invalid_json)
 
-        self.assertIn("content must be string", str(cm.exception).lower())
+        self.assertIn("content must be str", str(cm.exception).lower())
+
+    def test_parse_invalid_message_speaker_raises_error(self):
+        """Test that invalid message speaker raises validation error."""
+        # Non-string speaker
+        invalid_json = json.dumps(
+            {
+                "messages": [
+                    {"speaker": 456, "content": "Hello"}  # Number instead of string
+                ]
+            }
+        )
+
+        with self.assertRaises(ConversationParseError) as cm:
+            self.converter.parse(invalid_json)
+
+        self.assertIn("speaker must be str", str(cm.exception).lower())
 
     def test_parse_logs_conversion_steps(self):
         """Test that parsing logs conversion steps for observability."""

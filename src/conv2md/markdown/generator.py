@@ -36,10 +36,20 @@ class MarkdownGenerator:
             lines.append("---")
             lines.append("")  # Blank line after frontmatter
 
+        def escape_markdown(text):
+            """Escape Markdown special characters to prevent formatting issues."""
+            # Escape Markdown special characters: \ ` * _ { } [ ] ( ) # + - . ! |
+            escape_chars = "\\`*_{}[]()#+-.!|"
+            for char in escape_chars:
+                text = text.replace(char, f"\\{char}")
+            return text
+
         for i, message in enumerate(conversation.messages):
             # Format each message as bold speaker with content
             logger.debug(f"Formatting message {i+1}: {message.speaker}")
-            lines.append(f"**{message.speaker}:** {message.content}")
+            escaped_speaker = escape_markdown(str(message.speaker))
+            escaped_content = escape_markdown(str(message.content))
+            lines.append(f"**{escaped_speaker}:** {escaped_content}")
             lines.append("")  # Add blank line between messages
 
         # Remove trailing blank line

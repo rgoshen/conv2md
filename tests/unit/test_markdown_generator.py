@@ -30,7 +30,7 @@ class TestMarkdownGenerator(unittest.TestCase):
         self.assertIn("User", result)
         self.assertIn("Hello", result)
         self.assertIn("Assistant", result)
-        self.assertIn("Hi there!", result)
+        self.assertIn("Hi there\\!", result)  # Exclamation is escaped
 
         # Verify proper Markdown formatting
         lines = result.strip().split("\n")
@@ -62,6 +62,24 @@ class TestMarkdownGenerator(unittest.TestCase):
 
         self.assertIsNotNone(closing_index, "Should have closing --- for frontmatter")
         self.assertIn("**User:**", result)
+
+    def test_generate_escapes_markdown_characters(self):
+        """Test that Markdown special characters are escaped in output."""
+        # Create conversation with Markdown special characters
+        messages = [
+            Message(speaker="User*Bold*", content="Hello _italic_ and `code`!"),
+            Message(speaker="Bot[link]", content="Text with # heading and **bold**"),
+        ]
+        conversation = Conversation(messages=messages)
+
+        # Generate Markdown
+        result = self.generator.generate(conversation)
+
+        # Verify special characters are escaped
+        self.assertIn("User\\*Bold\\*", result)
+        self.assertIn("Hello \\_italic\\_ and \\`code\\`\\!", result)
+        self.assertIn("Bot\\[link\\]", result)
+        self.assertIn("Text with \\# heading and \\*\\*bold\\*\\*", result)
 
 
 if __name__ == "__main__":
