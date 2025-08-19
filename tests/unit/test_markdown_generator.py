@@ -267,25 +267,29 @@ class TestMarkdownGenerator(unittest.TestCase):
 
     def test_validation_total_conversation_size_exceeds_limit(self):
         """Test validation when total conversation size exceeds limit with multiple messages."""
-        # Create a generator with smaller limits for testing
+        # Import constants and patch for testing
+        from unittest.mock import patch
+        from conv2md.markdown.constants import MAX_TOTAL_CONVERSATION_SIZE
+        
+        # Create a generator and patch the constant for testing
         generator = MarkdownGenerator()
-        generator.MAX_TOTAL_SIZE = 200000  # 200KB total limit for testing
         
-        # Create multiple messages that individually are under the individual limit
-        # but together exceed the total limit after sanitization
-        # Each message will be sanitized to 100KB, so 3 messages = 300KB > 200KB limit
-        messages = []
-        for i in range(3):
-            # Create content larger than sanitization limit (will be truncated to 100KB)
-            content = "x" * 150000  # 150KB content -> sanitized to 100KB each
-            messages.append(Message(speaker=f"User{i}", content=content))
-        
-        conversation = Conversation(messages=messages)
+        with patch('conv2md.markdown.generator.MAX_TOTAL_CONVERSATION_SIZE', 200000):  # 200KB limit
+            # Create multiple messages that individually are under the individual limit
+            # but together exceed the total limit after sanitization
+            # Each message will be sanitized to 100KB, so 3 messages = 300KB > 200KB limit
+            messages = []
+            for i in range(3):
+                # Create content larger than sanitization limit (will be truncated to 100KB)
+                content = "x" * 150000  # 150KB content -> sanitized to 100KB each
+                messages.append(Message(speaker=f"User{i}", content=content))
+            
+            conversation = Conversation(messages=messages)
 
-        with self.assertRaises(ContentTooLargeError) as cm:
-            generator.generate(conversation)
-        
-        self.assertIn("Total conversation size exceeds limit", str(cm.exception))
+            with self.assertRaises(ContentTooLargeError) as cm:
+                generator.generate(conversation)
+            
+            self.assertIn("Total conversation size exceeds limit", str(cm.exception))
 
     def test_metrics_collection(self):
         """Test that metrics are collected during generation."""

@@ -17,16 +17,16 @@ from conv2md.markdown.exceptions import (
     EncodingError,
     ContentTooLargeError,
 )
+from conv2md.markdown.constants import (
+    MAX_MESSAGE_CONTENT_SIZE,
+    MAX_TOTAL_CONVERSATION_SIZE,
+)
 
 logger = logging.getLogger(__name__)
 
 
 class MarkdownGenerator:
     """Generates Markdown from conversation data."""
-
-    # Configuration constants
-    MAX_CONTENT_SIZE = 10 * 1024 * 1024  # 10MB limit per message
-    MAX_TOTAL_SIZE = 100 * 1024 * 1024  # 100MB total limit
 
     def __init__(self, pipeline: Optional[ContentProcessingPipeline] = None):
         """Initialize the markdown generator.
@@ -211,7 +211,7 @@ class MarkdownGenerator:
                 raw_content_bytes = str(message.content).encode("utf-8")
                 raw_content_size = len(raw_content_bytes)
 
-                if raw_content_size > self.MAX_CONTENT_SIZE:
+                if raw_content_size > MAX_MESSAGE_CONTENT_SIZE:
                     raise ContentTooLargeError(
                         f"Message {i} content exceeds size limit: {raw_content_size} bytes"
                     )
@@ -226,7 +226,7 @@ class MarkdownGenerator:
             sanitized_size = len(sanitized_content.encode("utf-8"))
             total_size += sanitized_size
 
-        if total_size > self.MAX_TOTAL_SIZE:
+        if total_size > MAX_TOTAL_CONVERSATION_SIZE:
             raise ContentTooLargeError(
                 f"Total conversation size exceeds limit: {total_size} bytes"
             )

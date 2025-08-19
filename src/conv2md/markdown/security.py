@@ -3,6 +3,12 @@
 import re
 import html
 from typing import Dict, Any
+from conv2md.markdown.constants import (
+    MAX_METADATA_VALUE_LENGTH,
+    MAX_SPEAKER_NAME_LENGTH,
+    MAX_TIMESTAMP_LENGTH,
+    MAX_CONTENT_SANITIZATION_SIZE,
+)
 
 
 def sanitize_yaml_metadata(metadata: Dict[str, Any]) -> Dict[str, Any]:
@@ -39,7 +45,7 @@ def sanitize_yaml_value(value: Any) -> str:
         Sanitized string value safe for YAML
     """
     # Convert to string and limit length
-    str_value = str(value)[:1000]  # Limit to prevent DoS
+    str_value = str(value)[:MAX_METADATA_VALUE_LENGTH]
 
     # HTML escape first to prevent injection
     str_value = html.escape(str_value)
@@ -77,7 +83,7 @@ def sanitize_content(content: str) -> str:
         return ""
 
     # Limit content length to prevent DoS
-    content = content[:100000]  # 100KB limit
+    content = content[:MAX_CONTENT_SANITIZATION_SIZE]
 
     # Remove null bytes and other control characters (except newlines and tabs)
     content = re.sub(r"[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]", "", content)
@@ -104,7 +110,7 @@ def validate_speaker_name(speaker: str) -> str:
         raise ValueError("Speaker name cannot be empty")
 
     # Limit length
-    speaker = speaker.strip()[:100]
+    speaker = speaker.strip()[:MAX_SPEAKER_NAME_LENGTH]
 
     # Remove control characters
     speaker = re.sub(r"[\x00-\x1F\x7F]", "", speaker)
@@ -131,7 +137,7 @@ def validate_timestamp(timestamp: str) -> str:
         return ""
 
     # Limit length
-    timestamp = timestamp.strip()[:50]
+    timestamp = timestamp.strip()[:MAX_TIMESTAMP_LENGTH]
 
     # Remove control characters
     timestamp = re.sub(r"[\x00-\x1F\x7F]", "", timestamp)
