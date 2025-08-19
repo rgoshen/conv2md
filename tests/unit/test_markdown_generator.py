@@ -328,6 +328,43 @@ class TestMarkdownGenerator(unittest.TestCase):
         # Invalid key should be sanitized and included
         self.assertIn("invalid_key_", result)
 
+    def test_specific_exception_handling_in_message_processing(self):
+        """Test that only specific exceptions are caught during message processing."""
+        from unittest.mock import Mock
+        
+        # Test that ValueError (a processing error) is caught and converted
+        mock_pipeline = Mock()
+        mock_pipeline.process_message.side_effect = ValueError("Mock processing error")
+        
+        generator = MarkdownGenerator(pipeline=mock_pipeline)
+        messages = [Message(speaker="User", content="Test")]
+        conversation = Conversation(messages=messages)
+        
+        # Should catch ValueError and convert to InvalidContentError
+        with self.assertRaises(InvalidContentError) as cm:
+            generator.generate(conversation)
+        
+        self.assertIn("Failed to process message 1", str(cm.exception))
+        self.assertIn("Mock processing error", str(cm.exception))
+
+    def test_unexpected_exceptions_are_not_masked(self):
+        """Test that unexpected exceptions like RuntimeError are not caught."""
+        from unittest.mock import Mock
+        
+        # Create a mock pipeline that raises an unexpected exception
+        mock_pipeline = Mock()
+        mock_pipeline.process_message.side_effect = RuntimeError("Unexpected error")
+        
+        generator = MarkdownGenerator(pipeline=mock_pipeline)
+        messages = [Message(speaker="User", content="Test")]
+        conversation = Conversation(messages=messages)
+        
+        # RuntimeError should NOT be caught - it should bubble up
+        with self.assertRaises(RuntimeError) as cm:
+            generator.generate(conversation)
+        
+        self.assertIn("Unexpected error", str(cm.exception))
+
 
 if __name__ == "__main__":
     unittest.main()

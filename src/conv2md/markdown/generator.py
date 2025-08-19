@@ -106,7 +106,7 @@ class MarkdownGenerator:
 
                     lines.append("")  # Add blank line between messages
 
-                except Exception as e:
+                except (ValueError, TypeError, AttributeError) as e:
                     logger.error(f"Error processing message {i + 1}: {e}")
                     self.metrics_collector.record_error(e)
                     raise InvalidContentError(
