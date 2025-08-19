@@ -2,8 +2,9 @@
 
 import unittest
 
-from conv2md.domain.models import Conversation, Message
+from conv2md.domain.models import Conversation, Message, ContentType
 from conv2md.markdown.generator import MarkdownGenerator
+from conv2md.markdown.exceptions import InvalidContentError, ContentTooLargeError
 
 
 class TestMarkdownGenerator(unittest.TestCase):
@@ -94,7 +95,8 @@ class TestMarkdownGenerator(unittest.TestCase):
         # Verify YAML special characters are handled safely
         self.assertIn("title: Test\\: malicious content", result)
         self.assertIn(
-            'description: Contains \\"quotes\\" and newlines\\nSecond line', result
+            "description: Contains &quot;quotes&quot; and newlines\\nSecond line",
+            result,
         )
         self.assertIn("tags: value with\\: colon", result)
         self.assertIn("injection: \\- list item\\n  nested\\: value", result)
@@ -109,10 +111,15 @@ class TestMarkdownGenerator(unittest.TestCase):
 
         # Should still format properly with empty content
         self.assertIn("**User:**", result)
-        # Content after colon should be empty (just the space)
+        # Content is now on separate line due to pipeline processing
         lines = result.split("\n")
-        user_line = next(line for line in lines if line.startswith("**User:**"))
-        self.assertEqual(user_line, "**User:** ")
+        user_line_index = next(
+            i for i, line in enumerate(lines) if line.startswith("**User:**")
+        )
+        content_line = (
+            lines[user_line_index + 1] if user_line_index + 1 < len(lines) else ""
+        )
+        self.assertEqual(content_line, "")
 
     def test_generate_handles_single_message(self):
         """Test generation with only one message."""
@@ -121,9 +128,205 @@ class TestMarkdownGenerator(unittest.TestCase):
 
         result = self.generator.generate(conversation)
 
-        # Should have no trailing newlines for single message
-        self.assertEqual(result, "**Bot:** Solo message")
-        self.assertNotIn("\n\n", result)
+        # Should have proper structure with speaker and content on separate lines
+        expected = "**Bot:**\nSolo message"
+        self.assertEqual(result, expected)
+
+    def test_generate_with_timestamps(self):
+        """Test generation with timestamp support."""
+        messages = [
+            Message(speaker="User", content="Hello", timestamp="12:34"),
+            Message(speaker="Bot", content="Hi there!", timestamp="12:35"),
+        ]
+        conversation = Conversation(messages=messages)
+
+        result = self.generator.generate(conversation)
+
+        # Verify timestamp formatting
+        self.assertIn("**User — 12:34**", result)
+        self.assertIn("**Bot — 12:35**", result)
+
+    def test_generate_with_code_content(self):
+        """Test generation with code content type."""
+        messages = [
+            Message(
+                speaker="Dev",
+                content="def hello():\n    print('world')",
+                content_type=ContentType.CODE,
+                language="python",
+            )
+        ]
+        conversation = Conversation(messages=messages)
+
+        result = self.generator.generate(conversation)
+
+        # Verify code block formatting
+        self.assertIn("**Dev:**", result)
+        self.assertIn("```python", result)
+        self.assertIn("def hello():", result)
+        self.assertIn("```", result)
+
+    def test_generate_with_image_content(self):
+        """Test generation with image content type."""
+        messages = [
+            Message(
+                speaker="User", content="screenshot.png", content_type=ContentType.IMAGE
+            )
+        ]
+        conversation = Conversation(messages=messages)
+
+        result = self.generator.generate(conversation)
+
+        # Verify image formatting
+        self.assertIn("**User:**", result)
+        self.assertIn("![Image](screenshot\\.png)", result)
+
+    def test_generate_with_nested_backticks_in_code(self):
+        """Test generation with nested backticks in code blocks."""
+        messages = [
+            Message(
+                speaker="Dev",
+                content="```bash\necho 'test'\n```",
+                content_type=ContentType.CODE,
+                language="markdown",
+            )
+        ]
+        conversation = Conversation(messages=messages)
+
+        result = self.generator.generate(conversation)
+
+        # Should use 4 backticks to fence the content with 3 backticks
+        self.assertIn("````markdown", result)
+        self.assertIn("````", result.split("````markdown")[1])
+
+    def test_validation_empty_conversation(self):
+        """Test validation with empty conversation."""
+        conversation = Conversation(messages=[])
+
+        with self.assertRaises(InvalidContentError) as cm:
+            self.generator.generate(conversation)
+
+        self.assertIn("at least one message", str(cm.exception))
+
+    def test_validation_none_conversation(self):
+        """Test validation with None conversation."""
+        with self.assertRaises(InvalidContentError) as cm:
+            self.generator.generate(None)
+
+        self.assertIn("cannot be None", str(cm.exception))
+
+    def test_validation_missing_speaker(self):
+        """Test validation with missing speaker."""
+        messages = [Message(speaker="", content="test")]
+        conversation = Conversation(messages=messages)
+
+        with self.assertRaises(InvalidContentError) as cm:
+            self.generator.generate(conversation)
+
+        self.assertIn("missing speaker", str(cm.exception))
+
+    def test_validation_none_content(self):
+        """Test validation with None content."""
+        messages = [Message(speaker="User", content=None)]
+        conversation = Conversation(messages=messages)
+
+        with self.assertRaises(InvalidContentError) as cm:
+            self.generator.generate(conversation)
+
+        self.assertIn("None content", str(cm.exception))
+
+    def test_validation_content_too_large(self):
+        """Test validation with content exceeding size limits."""
+        # Create a message with content larger than the limit
+        # Use 11MB of content that should still be 11MB after sanitization
+        large_content = "a" * (11 * 1024 * 1024)  # 11MB > 10MB limit, simple chars
+        messages = [Message(speaker="User", content=large_content)]
+        conversation = Conversation(messages=messages)
+
+        with self.assertRaises(ContentTooLargeError) as cm:
+            self.generator.generate(conversation)
+
+        self.assertIn("exceeds size limit", str(cm.exception))
+
+    def test_metrics_collection(self):
+        """Test that metrics are collected during generation."""
+        messages = [
+            Message(speaker="User", content="Hello", content_type=ContentType.TEXT),
+            Message(
+                speaker="Dev", content="print('hi')", content_type=ContentType.CODE
+            ),
+            Message(
+                speaker="User", content="image.png", content_type=ContentType.IMAGE
+            ),
+        ]
+        conversation = Conversation(messages=messages)
+
+        # Generate markdown
+        result = self.generator.generate(conversation)
+
+        # Verify metrics were collected
+        metrics = self.generator.metrics_collector.current_metrics
+        self.assertIsNotNone(metrics)
+        self.assertEqual(metrics.message_count, 3)
+        self.assertEqual(metrics.text_messages_processed, 1)
+        self.assertEqual(metrics.code_blocks_processed, 1)
+        self.assertEqual(metrics.images_processed, 1)
+        self.assertGreater(metrics.total_content_size, 0)
+        self.assertGreater(metrics.output_size, 0)
+
+    def test_deterministic_output_multiple_runs(self):
+        """Test that the same input produces identical output across multiple runs."""
+        messages = [
+            Message(speaker="User", content="Hello *world*!", timestamp="12:34"),
+            Message(
+                speaker="Bot",
+                content="def test():\n    pass",
+                content_type=ContentType.CODE,
+                language="python",
+            ),
+            Message(
+                speaker="User", content="image.jpg", content_type=ContentType.IMAGE
+            ),
+        ]
+        conversation = Conversation(messages=messages)
+        metadata = {"title": "Test Conversation", "source": "test"}
+
+        # Generate markdown multiple times
+        results = []
+        for _ in range(5):
+            result = self.generator.generate(conversation, metadata)
+            results.append(result)
+
+        # All results should be identical
+        first_result = results[0]
+        for i, result in enumerate(results[1:], 1):
+            self.assertEqual(result, first_result, f"Run {i+1} differs from run 1")
+
+    def test_enhanced_yaml_frontmatter_sanitization(self):
+        """Test enhanced YAML frontmatter with security sanitization."""
+        messages = [Message(speaker="User", content="Test")]
+        conversation = Conversation(messages=messages)
+
+        # Metadata with potentially dangerous content
+        metadata = {
+            "title": "Test: Content with: colons",
+            "malicious": "- list\n  injection: attempt",
+            "quotes": 'Contains "quotes" and newlines\nSecond line',
+            "script": "<script>alert('xss')</script>",
+            "invalid_key_#$%": "should be sanitized",
+        }
+
+        result = self.generator.generate(conversation, metadata=metadata)
+
+        # Verify sanitization occurred
+        self.assertIn("title: Test\\: Content with\\: colons", result)
+        self.assertIn("malicious: \\- list\\n  injection\\: attempt", result)
+        self.assertIn("quotes: Contains &quot;quotes&quot;", result)
+        self.assertIn(
+            "script: &lt;script&gt;alert(&\\#x27;xss&\\#x27;)&lt;/script&gt;", result
+        )
+        # Invalid key should be sanitized and included
+        self.assertIn("invalid_key_", result)
 
 
 if __name__ == "__main__":

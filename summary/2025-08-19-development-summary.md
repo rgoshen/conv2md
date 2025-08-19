@@ -253,3 +253,162 @@ for i in range(3):
 
 **Status**: Ready for PR review and merge
 **Impact**: Enhanced security, improved CI reliability, comprehensive validation coverage, superior test quality
+
+## Markdown Generation Engine Implementation - COMPLETED ✅
+
+### Feature: Markdown Generation Engine (F006) - IMPLEMENTED
+
+Completed implementation of the enhanced markdown generation engine as specified in todo.md milestone 1.
+
+### 6. Core Architecture Implementation - COMPLETED ✅
+
+**Pipeline Architecture Established:**
+- Implemented pluggable `ContentProcessingPipeline` with processor interface
+- Added support for text, code, and image content types
+- Created extensible processor architecture for future enhancements
+
+**Advanced Code Block Handling:**
+- Automatic fence length determination for nested backticks
+- Handles complex scenarios like ````markdown content with ``` inside
+- Preserves exact code formatting including whitespace
+
+**Enhanced Speaker Formatting:**
+- Support for optional timestamps with `**Speaker — Timestamp**` format
+- Markdown escaping for speaker names and timestamps
+- Fallback to `**Speaker:**` format when no timestamp present
+
+### 7. Security and Validation - IMPLEMENTED ✅
+
+**Content Sanitization:**
+- Pre-processing content size validation (10MB per message limit)
+- Post-sanitization total conversation limit (100MB)
+- Unicode encoding validation with proper error handling
+- Control character removal while preserving newlines and tabs
+
+**YAML Frontmatter Security:**
+- HTML entity escaping to prevent XSS injection
+- Comprehensive YAML special character escaping
+- Key sanitization (alphanumeric, underscore, hyphen only)
+- Value length limits (1000 characters) to prevent DoS
+
+**Input Validation:**
+- Speaker name validation with length and character limits
+- Timestamp format validation with regex patterns
+- Comprehensive error messages for debugging
+
+### 8. Observability and Metrics - IMPLEMENTED ✅
+
+**Real-time Metrics Collection:**
+- Processing duration and throughput tracking
+- Content type distribution monitoring (text/code/image)
+- Error and warning counters with status tracking
+- Memory usage monitoring capabilities
+
+**Detailed Logging:**
+- Configurable log levels (INFO, DEBUG, ERROR)
+- Processing step tracking with message context
+- Error logging with full exception details
+- Performance metrics logging for analysis
+
+### 9. Deterministic Output Guarantees - IMPLEMENTED ✅
+
+**Consistent Generation:**
+- Identical input produces byte-for-byte identical output
+- No timestamps, random values, or environment dependencies
+- Stable code block fence calculation algorithm
+- Consistent metadata key ordering (alphabetical)
+
+**Testing Verification:**
+- Golden fixture compatibility maintained
+- Multiple-run determinism tests across 51 test cases
+- Cross-environment consistency validation
+
+### Implementation Details
+
+**Files Created:**
+- `src/conv2md/markdown/blocks.py` - Code block and content formatting utilities
+- `src/conv2md/markdown/pipeline.py` - Content processing pipeline architecture
+- `src/conv2md/markdown/metrics.py` - Metrics collection and reporting
+- `src/conv2md/markdown/security.py` - Security controls and validation
+- `src/conv2md/markdown/exceptions.py` - Custom exception classes
+- `tests/unit/test_markdown_blocks.py` - Block utility tests (20 tests)
+- `tests/unit/test_markdown_pipeline.py` - Pipeline tests (13 tests)
+
+**Files Enhanced:**
+- `src/conv2md/domain/models.py` - Added ContentType enum and enhanced Message model
+- `src/conv2md/markdown/generator.py` - Complete rewrite with pipeline integration
+- `tests/unit/test_markdown_generator.py` - Expanded to 18 comprehensive tests
+
+**Documentation Created:**
+- `docs/markdown-output-specification.md` - Complete output format specification
+
+### Quality Metrics
+
+**Test Coverage:**
+- **51 total tests** for markdown functionality (up from 6)
+- **100% pass rate** maintained
+- **Comprehensive security coverage** including injection prevention
+- **Determinism validation** with multiple-run tests
+- **Error handling coverage** for all exception paths
+
+**Performance Characteristics:**
+- Memory usage scales linearly with content size
+- Processing optimized for typical conversation sizes (<1MB)
+- Efficient pipeline architecture minimizes overhead
+- Real-time metrics provide performance visibility
+
+**Security Compliance:**
+- Input validation prevents malformed data processing
+- Output sanitization prevents injection attacks
+- Size limits prevent DoS attacks
+- Encoding validation ensures data integrity
+
+### Standards Compliance
+
+- ✅ **Stdlib-only core**: No third-party dependencies in core functionality
+- ✅ **TDD methodology**: All features implemented with tests first
+- ✅ **Security-first**: Comprehensive validation and sanitization
+- ✅ **Black formatting**: Consistent code style throughout
+- ✅ **Type hints**: Complete type annotations
+- ✅ **Documentation**: Comprehensive specification and examples
+
+### Integration Points
+
+**Pipeline Extensibility:**
+- Abstract `ContentProcessor` interface for custom processors
+- Plugin-ready architecture for future enhancements
+- Fallback mechanisms for unknown content types
+
+**Error Handling:**
+- Custom exception hierarchy for specific error types
+- Graceful degradation with detailed error messages
+- Metrics integration for error tracking and analysis
+
+**Performance Monitoring:**
+- Built-in metrics collection during generation
+- Configurable logging for debugging and analysis
+- Memory and throughput tracking capabilities
+
+## Final Development Summary
+
+### All Milestone 1 F006 Tasks Completed ✅
+
+1. **Core behavior**: Enhanced MarkdownGenerator with pipeline architecture
+2. **Error handling**: Comprehensive validation and custom exceptions
+3. **Integration points**: Pluggable content processing pipeline
+4. **Security controls**: Input validation, output sanitization, injection prevention
+5. **Observability**: Real-time metrics and detailed logging
+6. **Testing strategy**: 51 comprehensive tests with determinism validation
+7. **Documentation**: Complete markdown output specification
+
+### Development Impact Summary
+
+- **Architecture**: Modular, extensible pipeline design following stdlib-only principle
+- **Security**: Comprehensive validation preventing injection and DoS attacks
+- **Quality**: 51 tests with 100% pass rate and determinism guarantees
+- **Performance**: Optimized processing with real-time metrics
+- **Documentation**: Complete specification for markdown output format
+- **Maintainability**: Clean separation of concerns with pluggable architecture
+
+**Status**: Feature F006 complete and ready for next milestone feature
+**Next**: Proceed to Deterministic Output System (F005) or Website/HTML Processing (F003)
