@@ -49,13 +49,13 @@
 
 ### Feature: Markdown Generation Engine (P0) - F006
 
-- [ ] Core behavior: Convert structured data to clean Markdown
-- [ ] Error handling: Invalid content, encoding issues
-- [ ] Integration points: Content processing pipeline
-- [ ] Security controls: Output encoding and sanitization
-- [ ] Observability: Conversion metrics and error tracking
-- [ ] Testing strategy: Code block fence handling, determinism tests
-- [ ] Documentation: Markdown output specification
+- [x] Core behavior: Convert structured data to clean Markdown
+- [x] Error handling: Invalid content, encoding issues
+- [x] Integration points: Content processing pipeline
+- [x] Security controls: Output encoding and sanitization
+- [x] Observability: Conversion metrics and error tracking
+- [x] Testing strategy: Code block fence handling, determinism tests
+- [x] Documentation: Markdown output specification
 
 **Dependencies**: Core Domain Models
 **Estimate**: M (1-2 days)

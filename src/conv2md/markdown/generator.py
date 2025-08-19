@@ -1,14 +1,41 @@
 """Markdown generator for conversations."""
 
 import logging
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from conv2md.domain.models import Conversation
+from conv2md.markdown.blocks import format_speaker_line
+from conv2md.markdown.pipeline import ContentProcessingPipeline
+from conv2md.markdown.metrics import MetricsCollector
+from conv2md.markdown.security import (
+    sanitize_yaml_metadata,
+    sanitize_content,
+    validate_speaker_name,
+    validate_timestamp,
+)
+from conv2md.markdown.exceptions import (
+    InvalidContentError,
+    EncodingError,
+    ContentTooLargeError,
+)
+from conv2md.markdown.constants import (
+    MAX_MESSAGE_CONTENT_SIZE,
+    MAX_TOTAL_CONVERSATION_SIZE,
+)
 
 logger = logging.getLogger(__name__)
 
 
 class MarkdownGenerator:
     """Generates Markdown from conversation data."""
+
+    def __init__(self, pipeline: Optional[ContentProcessingPipeline] = None):
+        """Initialize the markdown generator.
+
+        Args:
+            pipeline: Optional custom content processing pipeline
+        """
+        self.pipeline = pipeline or ContentProcessingPipeline()
+        self.metrics_collector = MetricsCollector()
 
     def generate(
         self, conversation: Conversation, metadata: Optional[Dict[str, Any]] = None
@@ -21,56 +48,190 @@ class MarkdownGenerator:
 
         Returns:
             Markdown formatted string
+
+        Raises:
+            InvalidContentError: If conversation data is invalid
+            EncodingError: If content has encoding issues
+            ContentTooLargeError: If content exceeds size limits
         """
         logger.info("Starting Markdown generation")
-        logger.debug(f"Converting {len(conversation.messages)} messages to Markdown")
 
+        # Start metrics collection
+        self.metrics_collector.start_conversion()
+
+        try:
+            # Validate input
+            self._validate_conversation(conversation)
+
+            logger.debug(
+                f"Converting {len(conversation.messages)} messages to Markdown"
+            )
+
+            lines = []
+
+            # Add YAML frontmatter if metadata provided
+            if metadata:
+                lines.extend(self._build_frontmatter(metadata))
+
+            # Process all messages
+            lines.extend(self._build_message_lines(conversation.messages))
+
+            # Remove trailing blank line
+            if lines and lines[-1] == "":
+                lines.pop()
+
+            result = "\n".join(lines)
+            markdown_length = len(result)
+
+            # Finish metrics collection
+            final_metrics = self.metrics_collector.finish_conversion(markdown_length)
+
+            logger.info(f"Markdown generation completed: {markdown_length} characters")
+            logger.debug(f"Conversion metrics: {final_metrics.to_dict()}")
+
+            return result
+
+        except Exception as e:
+            # Record error in metrics before re-raising
+            self.metrics_collector.record_error(e)
+            raise
+
+    def _build_frontmatter(self, metadata: Dict[str, Any]) -> List[str]:
+        """Build YAML frontmatter lines from metadata.
+
+        Args:
+            metadata: Metadata dictionary to convert to YAML frontmatter
+
+        Returns:
+            List of frontmatter lines including opening/closing delimiters
+        """
+        logger.debug(f"Adding YAML frontmatter with {len(metadata)} fields")
+        # Sanitize metadata for security
+        safe_metadata = sanitize_yaml_metadata(metadata)
+
+        lines = ["---"]
+        # Sort keys for deterministic output
+        for key in sorted(safe_metadata.keys()):
+            value = safe_metadata[key]
+            lines.append(f"{key}: {value}")
+        lines.extend(["---", ""])  # Closing delimiter and blank line
+
+        return lines
+
+    def _build_message_lines(self, messages) -> List[str]:
+        """Build markdown lines from conversation messages.
+
+        Args:
+            messages: List of Message objects to process
+
+        Returns:
+            List of markdown lines for all messages
+
+        Raises:
+            InvalidContentError: If message processing fails
+        """
         lines = []
 
-        def escape_yaml_value(value):
-            """Escape YAML special characters to prevent injection."""
-            # Convert to string and escape YAML special characters
-            str_value = str(value)
-            # Escape key YAML characters: : " \ newlines, list markers
-            str_value = str_value.replace("\\", "\\\\")  # Escape backslashes first
-            str_value = str_value.replace(":", "\\:")
-            str_value = str_value.replace('"', '\\"')
-            str_value = str_value.replace("\n", "\\n")
-            str_value = str_value.replace("\r", "\\r")
-            str_value = str_value.replace("-", "\\-")  # Prevent list interpretation
-            return str_value
+        for i, message in enumerate(messages):
+            try:
+                # Format each message with enhanced speaker line and content handling
+                logger.debug(
+                    f"Formatting message {i + 1}: {message.speaker} ({message.content_type.value})"
+                )
 
-        # Add YAML frontmatter if metadata provided
-        if metadata:
-            logger.debug(f"Adding YAML frontmatter with {len(metadata)} fields")
-            lines.append("---")
-            for key, value in metadata.items():
-                escaped_value = escape_yaml_value(value)
-                lines.append(f"{key}: {escaped_value}")
-            lines.append("---")
-            lines.append("")  # Blank line after frontmatter
+                # Create speaker line with optional timestamp
+                speaker_line = format_speaker_line(
+                    message.speaker, message.timestamp
+                )
+                lines.append(speaker_line)
 
-        def escape_markdown(text):
-            """Escape Markdown special characters to prevent formatting issues."""
-            # Escape Markdown special characters: \ ` * _ { } [ ] ( ) # + - . ! |
-            escape_chars = "\\`*_{}[]()#+-.!|"
-            for char in escape_chars:
-                text = text.replace(char, f"\\{char}")
-            return text
+                # Process content using the pipeline
+                processed_content = self.pipeline.process_message(message)
+                lines.append(processed_content)
+
+                # Record metrics for this message
+                content_size = len(str(message.content))
+                self.metrics_collector.record_message_processed(
+                    message.content_type.value, content_size
+                )
+
+                lines.append("")  # Add blank line between messages
+
+            except (ValueError, TypeError, AttributeError) as e:
+                logger.error(f"Error processing message {i + 1}: {e}")
+                self.metrics_collector.record_error(e)
+                raise InvalidContentError(
+                    f"Failed to process message {i + 1}: {e}"
+                ) from e
+
+        return lines
+
+    def _validate_conversation(self, conversation: Conversation) -> None:
+        """Validate conversation data before processing.
+
+        Args:
+            conversation: Conversation to validate
+
+        Raises:
+            InvalidContentError: If conversation data is invalid
+            ContentTooLargeError: If content exceeds limits
+            EncodingError: If content has encoding issues
+        """
+        if not conversation:
+            raise InvalidContentError("Conversation cannot be None")
+
+        if not conversation.messages:
+            raise InvalidContentError("Conversation must have at least one message")
+
+        total_size = 0
 
         for i, message in enumerate(conversation.messages):
-            # Format each message as bold speaker with content
-            logger.debug(f"Formatting message {i + 1}: {message.speaker}")
-            escaped_speaker = escape_markdown(str(message.speaker))
-            escaped_content = escape_markdown(str(message.content))
-            lines.append(f"**{escaped_speaker}:** {escaped_content}")
-            lines.append("")  # Add blank line between messages
+            if not message.speaker:
+                raise InvalidContentError(f"Message {i} missing speaker")
 
-        # Remove trailing blank line
-        if lines and lines[-1] == "":
-            lines.pop()
+            if message.content is None:
+                raise InvalidContentError(f"Message {i} has None content")
 
-        markdown_length = len("\n".join(lines))
-        logger.info(f"Markdown generation completed: {markdown_length} characters")
+            # Validate and sanitize speaker name
+            try:
+                validate_speaker_name(message.speaker)
+            except ValueError as e:
+                raise InvalidContentError(f"Message {i} invalid speaker: {e}")
 
-        return "\n".join(lines)
+            # Validate timestamp if present
+            if message.timestamp:
+                try:
+                    validate_timestamp(message.timestamp)
+                except ValueError as e:
+                    raise InvalidContentError(f"Message {i} invalid timestamp: {e}")
+
+            # Validate content size BEFORE sanitization to catch large content
+            try:
+                raw_content_bytes = str(message.content).encode("utf-8")
+                raw_content_size = len(raw_content_bytes)
+
+                if raw_content_size > MAX_MESSAGE_CONTENT_SIZE:
+                    raise ContentTooLargeError(
+                        f"Message {i} content exceeds size limit: "
+                        f"{raw_content_size} bytes"
+                    )
+
+            except UnicodeEncodeError as e:
+                raise EncodingError(f"Message {i} has encoding issues: {e}")
+
+            # Sanitize content after size validation
+            sanitized_content = sanitize_content(str(message.content))
+
+            # Add sanitized content size to total
+            sanitized_size = len(sanitized_content.encode("utf-8"))
+            total_size += sanitized_size
+
+        if total_size > MAX_TOTAL_CONVERSATION_SIZE:
+            raise ContentTooLargeError(
+                f"Total conversation size exceeds limit: {total_size} bytes"
+            )
+
+        logger.debug(
+            f"Conversation validation passed: {len(conversation.messages)} "
+            f"messages, {total_size} bytes"
+        )
