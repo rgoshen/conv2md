@@ -78,7 +78,7 @@ class JSONConverter:
             try:
                 speaker = msg_data["speaker"]
                 content = msg_data["content"]
-                logger.debug(f"Processing message {i+1}: speaker='{speaker}'")
+                logger.debug(f"Processing message {i + 1}: speaker='{speaker}'")
             except KeyError as e:
                 logger.error(f"Message {i} missing required field: {e}")
                 raise

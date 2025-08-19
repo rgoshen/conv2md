@@ -60,7 +60,7 @@ class MarkdownGenerator:
 
         for i, message in enumerate(conversation.messages):
             # Format each message as bold speaker with content
-            logger.debug(f"Formatting message {i+1}: {message.speaker}")
+            logger.debug(f"Formatting message {i + 1}: {message.speaker}")
             escaped_speaker = escape_markdown(str(message.speaker))
             escaped_content = escape_markdown(str(message.content))
             lines.append(f"**{escaped_speaker}:** {escaped_content}")
