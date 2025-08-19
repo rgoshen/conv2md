@@ -2,8 +2,8 @@
 
 import logging
 from typing import Dict, Any, Optional, List
-from conv2md.domain.models import Conversation, ContentType
-from conv2md.markdown.blocks import format_speaker_line, create_date_marker
+from conv2md.domain.models import Conversation
+from conv2md.markdown.blocks import format_speaker_line
 from conv2md.markdown.pipeline import ContentProcessingPipeline
 from conv2md.markdown.metrics import MetricsCollector
 from conv2md.markdown.security import (
