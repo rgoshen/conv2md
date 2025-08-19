@@ -138,13 +138,34 @@ def validate_timestamp(timestamp: str) -> str:
 
     # Limit length
     timestamp = timestamp.strip()[:MAX_TIMESTAMP_LENGTH]
+    
+    # Return empty if only whitespace after stripping
+    if not timestamp:
+        return ""
 
     # Remove control characters
     timestamp = re.sub(r"[\x00-\x1F\x7F]", "", timestamp)
 
-    # Basic validation - should look like a timestamp
-    # Allow common timestamp formats: ISO8601, Unix, human-readable
-    if not re.match(r"^[0-9:\-T\sAMPM.+Z]+$", timestamp, re.IGNORECASE):
+    # Improved validation for common timestamp formats
+    # Pattern 1: ISO8601 formats (2024-08-18T14:30:00Z, 2024-08-18T14:30:00+00:00, 2024-08-18)
+    iso8601_pattern = r"^\d{4}-\d{2}-\d{2}(?:T(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:[+-]\d{2}:\d{2}|Z)?)?$"
+    
+    # Pattern 2: Time only formats (14:30:00, 14:30, 2:30 PM, 02:30:45)
+    # 24-hour: 00-23:00-59:00-59, 12-hour: 01-12:00-59 AM/PM
+    time_24h_pattern = r"^(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$"
+    time_12h_pattern = r"^(?:0?[1-9]|1[0-2]):[0-5]\d(?::[0-5]\d)?\s*[APap][Mm]$"
+    
+    # Pattern 3: Unix timestamp (1692364200, 1692364200.123)
+    unix_pattern = r"^\d{10}(?:\.\d{1,6})?$"
+    
+    # Pattern 4: Human readable with spaces (2024-08-18 14:30:00)
+    human_readable_pattern = r"^\d{4}-\d{2}-\d{2}\s+(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d$"
+    
+    if not (re.match(iso8601_pattern, timestamp) or 
+            re.match(time_24h_pattern, timestamp) or 
+            re.match(time_12h_pattern, timestamp) or
+            re.match(unix_pattern, timestamp) or
+            re.match(human_readable_pattern, timestamp)):
         raise ValueError(f"Invalid timestamp format: {timestamp}")
 
     return timestamp
