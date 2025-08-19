@@ -181,6 +181,23 @@ class TestMarkdownGenerator(unittest.TestCase):
         self.assertIn("**User:**", result)
         self.assertIn("![Image](screenshot\\.png)", result)
 
+    def test_generate_with_image_content_special_characters(self):
+        """Test generation with image content containing special markdown characters."""
+        messages = [
+            Message(
+                speaker="User", 
+                content="my_image[1].png*special*.jpg", 
+                content_type=ContentType.IMAGE
+            )
+        ]
+        conversation = Conversation(messages=messages)
+
+        result = self.generator.generate(conversation)
+
+        # Verify image formatting with escaped special characters
+        self.assertIn("**User:**", result)
+        self.assertIn("![Image](my\\_image\\[1\\]\\.png\\*special\\*\\.jpg)", result)
+
     def test_generate_with_nested_backticks_in_code(self):
         """Test generation with nested backticks in code blocks."""
         messages = [
