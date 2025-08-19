@@ -24,23 +24,21 @@ class TestDeterministicOutput(unittest.TestCase):
         with open(fixture_path, "r") as f:
             json_content = f.read()
 
-        # Convert multiple times
+        # Convert multiple times and verify deterministic output
         results = []
-        for _ in range(3):
-            conversation = self.converter.parse(json_content)
-            markdown = self.generator.generate(conversation)
-            results.append(markdown)
+        for i in range(3):
+            with self.subTest(run=i + 1):
+                conversation = self.converter.parse(json_content)
+                markdown = self.generator.generate(conversation)
 
-        # All results should be identical
-        self.assertEqual(
-            results[0], results[1], "First and second conversion should be identical"
-        )
-        self.assertEqual(
-            results[1], results[2], "Second and third conversion should be identical"
-        )
-        self.assertEqual(
-            results[0], results[2], "First and third conversion should be identical"
-        )
+                # Compare with first result if we have previous results
+                if results:
+                    self.assertEqual(
+                        markdown,
+                        results[0],
+                        f"Run {i + 1} should match first run output",
+                    )
+                results.append(markdown)
 
     def test_markdown_generation_with_metadata_deterministic(self):
         """Test that Markdown generation with metadata is deterministic."""
@@ -52,16 +50,20 @@ class TestDeterministicOutput(unittest.TestCase):
         conversation = self.converter.parse(json_content)
         metadata = {"title": "Test", "source": "fixture", "created": "2025-01-01"}
 
-        # Generate multiple times with same metadata
+        # Generate multiple times with same metadata and verify deterministic output
         results = []
-        for _ in range(3):
-            markdown = self.generator.generate(conversation, metadata=metadata)
-            results.append(markdown)
+        for i in range(3):
+            with self.subTest(run=i + 1):
+                markdown = self.generator.generate(conversation, metadata=metadata)
 
-        # All results should be identical
-        self.assertEqual(
-            len(set(results)), 1, "All Markdown outputs should be identical"
-        )
+                # Compare with first result if we have previous results
+                if results:
+                    self.assertEqual(
+                        markdown,
+                        results[0],
+                        f"Run {i + 1} should match first run output",
+                    )
+                results.append(markdown)
 
     def test_golden_fixture_output_matches_expected(self):
         """Test that output matches pre-generated golden fixture."""
