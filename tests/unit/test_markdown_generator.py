@@ -305,7 +305,7 @@ class TestMarkdownGenerator(unittest.TestCase):
         conversation = Conversation(messages=messages)
 
         # Generate markdown
-        result = self.generator.generate(conversation)
+        self.generator.generate(conversation)
 
         # Verify metrics were collected
         metrics = self.generator.metrics_collector.current_metrics
