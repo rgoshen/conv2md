@@ -111,7 +111,9 @@ class MarkdownGenerator:
         safe_metadata = sanitize_yaml_metadata(metadata)
 
         lines = ["---"]
-        for key, value in safe_metadata.items():
+        # Sort keys for deterministic output
+        for key in sorted(safe_metadata.keys()):
+            value = safe_metadata[key]
             lines.append(f"{key}: {value}")
         lines.extend(["---", ""])  # Closing delimiter and blank line
 

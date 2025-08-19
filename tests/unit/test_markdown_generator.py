@@ -436,6 +436,41 @@ class TestMarkdownGenerator(unittest.TestCase):
         # Should have blank lines between messages
         self.assertIn("", result)
 
+    def test_frontmatter_keys_are_sorted_deterministically(self):
+        """Test that metadata keys in frontmatter are sorted for deterministic output."""
+        generator = MarkdownGenerator()
+        # Create metadata with keys in non-alphabetical order
+        metadata = {
+            "zzz_last": "last value",
+            "aaa_first": "first value", 
+            "mmm_middle": "middle value",
+            "title": "Test Title"
+        }
+        
+        result = generator._build_frontmatter(metadata)
+        
+        # Find the frontmatter content (between the --- delimiters)
+        content_lines = []
+        in_frontmatter = False
+        for line in result:
+            if line == "---":
+                if in_frontmatter:
+                    break  # End of frontmatter
+                else:
+                    in_frontmatter = True  # Start of frontmatter
+            elif in_frontmatter:
+                content_lines.append(line)
+        
+        # Keys should be in alphabetical order
+        expected_order = [
+            "aaa_first: first value",
+            "mmm_middle: middle value", 
+            "title: Test Title",
+            "zzz_last: last value"
+        ]
+        
+        self.assertEqual(content_lines, expected_order)
+
 
 if __name__ == "__main__":
     unittest.main()
