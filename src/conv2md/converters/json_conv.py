@@ -90,6 +90,7 @@ class JSONConverter:
 
             # Validate non-empty strings
             self._validate_non_empty_string(speaker, "speaker", i)
+            self._validate_non_empty_string(content, "content", i)
 
             message = Message(speaker=speaker, content=content)
             messages.append(message)
