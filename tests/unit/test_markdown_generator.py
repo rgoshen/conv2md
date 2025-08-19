@@ -404,6 +404,38 @@ class TestMarkdownGenerator(unittest.TestCase):
         
         self.assertIn("Unexpected error", str(cm.exception))
 
+    def test_build_frontmatter_helper_method(self):
+        """Test _build_frontmatter helper method directly."""
+        generator = MarkdownGenerator()
+        metadata = {"title": "Test Title", "source": "test.json"}
+        
+        result = generator._build_frontmatter(metadata)
+        
+        # Should have opening delimiter, content, closing delimiter, and blank line
+        self.assertEqual(result[0], "---")
+        self.assertIn("title: Test Title", result)
+        self.assertIn("source: test.json", result)
+        self.assertEqual(result[-2], "---")
+        self.assertEqual(result[-1], "")  # Blank line after frontmatter
+
+    def test_build_message_lines_helper_method(self):
+        """Test _build_message_lines helper method directly."""
+        generator = MarkdownGenerator()
+        messages = [
+            Message(speaker="User", content="Hello"),
+            Message(speaker="Bot", content="Hi there!")
+        ]
+        
+        result = generator._build_message_lines(messages)
+        
+        # Should have speaker lines, content lines, and blank lines
+        self.assertIn("**User:**", result)
+        self.assertIn("Hello", result)
+        self.assertIn("**Bot:**", result)
+        self.assertIn("Hi there\\!", result)  # Exclamation escaped
+        # Should have blank lines between messages
+        self.assertIn("", result)
+
 
 if __name__ == "__main__":
     unittest.main()

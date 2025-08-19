@@ -1,7 +1,7 @@
 """Markdown generator for conversations."""
 
 import logging
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from conv2md.domain.models import Conversation, ContentType
 from conv2md.markdown.blocks import format_speaker_line, create_date_marker
 from conv2md.markdown.pipeline import ContentProcessingPipeline
@@ -71,47 +71,10 @@ class MarkdownGenerator:
 
             # Add YAML frontmatter if metadata provided
             if metadata:
-                logger.debug(f"Adding YAML frontmatter with {len(metadata)} fields")
-                # Sanitize metadata for security
-                safe_metadata = sanitize_yaml_metadata(metadata)
+                lines.extend(self._build_frontmatter(metadata))
 
-                lines.append("---")
-                for key, value in safe_metadata.items():
-                    lines.append(f"{key}: {value}")
-                lines.append("---")
-                lines.append("")  # Blank line after frontmatter
-
-            for i, message in enumerate(conversation.messages):
-                try:
-                    # Format each message with enhanced speaker line and content handling
-                    logger.debug(
-                        f"Formatting message {i + 1}: {message.speaker} ({message.content_type.value})"
-                    )
-
-                    # Create speaker line with optional timestamp
-                    speaker_line = format_speaker_line(
-                        message.speaker, message.timestamp
-                    )
-                    lines.append(speaker_line)
-
-                    # Process content using the pipeline
-                    processed_content = self.pipeline.process_message(message)
-                    lines.append(processed_content)
-
-                    # Record metrics for this message
-                    content_size = len(str(message.content))
-                    self.metrics_collector.record_message_processed(
-                        message.content_type.value, content_size
-                    )
-
-                    lines.append("")  # Add blank line between messages
-
-                except (ValueError, TypeError, AttributeError) as e:
-                    logger.error(f"Error processing message {i + 1}: {e}")
-                    self.metrics_collector.record_error(e)
-                    raise InvalidContentError(
-                        f"Failed to process message {i + 1}: {e}"
-                    ) from e
+            # Process all messages
+            lines.extend(self._build_message_lines(conversation.messages))
 
             # Remove trailing blank line
             if lines and lines[-1] == "":
@@ -132,6 +95,75 @@ class MarkdownGenerator:
             # Record error in metrics before re-raising
             self.metrics_collector.record_error(e)
             raise
+
+    def _build_frontmatter(self, metadata: Dict[str, Any]) -> List[str]:
+        """Build YAML frontmatter lines from metadata.
+
+        Args:
+            metadata: Metadata dictionary to convert to YAML frontmatter
+
+        Returns:
+            List of frontmatter lines including opening/closing delimiters
+        """
+        logger.debug(f"Adding YAML frontmatter with {len(metadata)} fields")
+        
+        # Sanitize metadata for security
+        safe_metadata = sanitize_yaml_metadata(metadata)
+
+        lines = ["---"]
+        for key, value in safe_metadata.items():
+            lines.append(f"{key}: {value}")
+        lines.extend(["---", ""])  # Closing delimiter and blank line
+
+        return lines
+
+    def _build_message_lines(self, messages) -> List[str]:
+        """Build markdown lines from conversation messages.
+
+        Args:
+            messages: List of Message objects to process
+
+        Returns:
+            List of markdown lines for all messages
+
+        Raises:
+            InvalidContentError: If message processing fails
+        """
+        lines = []
+
+        for i, message in enumerate(messages):
+            try:
+                # Format each message with enhanced speaker line and content handling
+                logger.debug(
+                    f"Formatting message {i + 1}: {message.speaker} ({message.content_type.value})"
+                )
+
+                # Create speaker line with optional timestamp
+                speaker_line = format_speaker_line(
+                    message.speaker, message.timestamp
+                )
+                lines.append(speaker_line)
+
+                # Process content using the pipeline
+                processed_content = self.pipeline.process_message(message)
+                lines.append(processed_content)
+
+                # Record metrics for this message
+                content_size = len(str(message.content))
+                self.metrics_collector.record_message_processed(
+                    message.content_type.value, content_size
+                )
+
+                lines.append("")  # Add blank line between messages
+
+            except (ValueError, TypeError, AttributeError) as e:
+                logger.error(f"Error processing message {i + 1}: {e}")
+                self.metrics_collector.record_error(e)
+                raise InvalidContentError(
+                    f"Failed to process message {i + 1}: {e}"
+                ) from e
+
+        return lines
 
     def _validate_conversation(self, conversation: Conversation) -> None:
         """Validate conversation data before processing.
