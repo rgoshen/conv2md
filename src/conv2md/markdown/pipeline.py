@@ -1,7 +1,7 @@
 """Content processing pipeline for markdown generation."""
 
 from abc import ABC, abstractmethod
-from typing import Any, List
+from typing import List
 from conv2md.domain.models import Message, ContentType
 
 

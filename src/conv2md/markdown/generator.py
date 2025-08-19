@@ -57,7 +57,7 @@ class MarkdownGenerator:
         logger.info("Starting Markdown generation")
 
         # Start metrics collection
-        metrics = self.metrics_collector.start_conversion()
+        self.metrics_collector.start_conversion()
 
         try:
             # Validate input
@@ -106,7 +106,6 @@ class MarkdownGenerator:
             List of frontmatter lines including opening/closing delimiters
         """
         logger.debug(f"Adding YAML frontmatter with {len(metadata)} fields")
-        
         # Sanitize metadata for security
         safe_metadata = sanitize_yaml_metadata(metadata)
 
@@ -213,7 +212,8 @@ class MarkdownGenerator:
 
                 if raw_content_size > MAX_MESSAGE_CONTENT_SIZE:
                     raise ContentTooLargeError(
-                        f"Message {i} content exceeds size limit: {raw_content_size} bytes"
+                        f"Message {i} content exceeds size limit: "
+                        f"{raw_content_size} bytes"
                     )
 
             except UnicodeEncodeError as e:
@@ -232,5 +232,6 @@ class MarkdownGenerator:
             )
 
         logger.debug(
-            f"Conversation validation passed: {len(conversation.messages)} messages, {total_size} bytes"
+            f"Conversation validation passed: {len(conversation.messages)} "
+            f"messages, {total_size} bytes"
         )
