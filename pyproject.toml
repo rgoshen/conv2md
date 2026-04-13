@@ -24,7 +24,7 @@ plugins = [
     "requests>=2.28.0",
     "beautifulsoup4>=4.11.0",
     "openai>=1.0.0",
-    "pytesseract>=0.3.10",
+    "pytesseract>=0.3.13",
 ]
 
 [project.scripts]
