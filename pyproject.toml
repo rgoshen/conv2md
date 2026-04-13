@@ -17,7 +17,7 @@ dev = [
     "black>=22.0.0",
     "flake8>=5.0.0",
     "safety>=2.0.0",
-    "bandit[toml]>=1.7.0",
+    "bandit[toml]>=1.9.4",
     "pip-audit>=2.0.0",
 ]
 plugins = [
