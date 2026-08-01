@@ -265,6 +265,41 @@ class TestMarkdownGenerator(unittest.TestCase):
         content_line = result.split("\n")[1]
         self.assertEqual(len(content_line), MAX_CONTENT_SANITIZATION_SIZE)
 
+    def test_content_truncation_records_one_warning_and_continues(self):
+        """Truncation is a warned, partial success - never a silent loss."""
+        from unittest.mock import patch
+
+        cases = [
+            ("under limit", MAX_CONTENT_SANITIZATION_SIZE - 1, 0),
+            ("at limit", MAX_CONTENT_SANITIZATION_SIZE, 0),
+            ("over limit", MAX_CONTENT_SANITIZATION_SIZE + 1, 1),
+        ]
+
+        for label, content_length, expected_warnings in cases:
+            with self.subTest(case=label):
+                generator = MarkdownGenerator()
+                conversation = Conversation(
+                    messages=[Message(speaker="User", content="x" * content_length)]
+                )
+                collector = generator.metrics_collector
+
+                with patch.object(
+                    collector, "record_warning", wraps=collector.record_warning
+                ) as spy:
+                    result = generator.generate(conversation)
+
+                self.assertEqual(spy.call_count, expected_warnings)
+                self.assertEqual(
+                    collector.current_metrics.warnings_issued, expected_warnings
+                )
+                # Conversion continues regardless - warnings never abort
+                self.assertTrue(result.startswith("**User:**"))
+
+                if expected_warnings:
+                    warning = spy.call_args.args[0]
+                    self.assertIn("Message 0", warning)
+                    self.assertIn(str(MAX_CONTENT_SANITIZATION_SIZE), warning)
+
     def test_validation_empty_conversation(self):
         """Test validation with empty conversation."""
         conversation = Conversation(messages=[])
@@ -338,8 +373,10 @@ class TestMarkdownGenerator(unittest.TestCase):
                 generator.generate(conversation)
 
             self.assertIn("Total conversation size exceeds limit", str(cm.exception))
-            # Raw bytes, not the per-message sanitization cap (3 x 102400)
-            self.assertIn("450000 bytes", str(cm.exception))
+            # Fail-fast: the second message is the one that crosses 200KB, so
+            # the third is never sanitized and the reported total is 2 x 150000.
+            # Raw bytes, not the per-message sanitization cap (2 x 102400).
+            self.assertIn("300000 bytes", str(cm.exception))
 
     def test_validation_total_size_counts_raw_content_bytes(self):
         """The total-size guard must bound the payload, not the message count."""

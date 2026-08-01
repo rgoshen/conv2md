@@ -19,6 +19,7 @@ from conv2md.markdown.exceptions import (
     ContentTooLargeError,
 )
 from conv2md.markdown.constants import (
+    MAX_CONTENT_SANITIZATION_SIZE,
     MAX_MESSAGE_CONTENT_SIZE,
     MAX_TOTAL_CONVERSATION_SIZE,
 )
@@ -119,7 +120,7 @@ class MarkdownGenerator:
 
         return lines
 
-    def _build_message_lines(self, messages) -> List[str]:
+    def _build_message_lines(self, messages: List[Message]) -> List[str]:
         """Build markdown lines from conversation messages.
 
         Args:
@@ -230,13 +231,30 @@ class MarkdownGenerator:
             except UnicodeEncodeError as e:
                 raise EncodingError(f"Message {i} has encoding issues: {e}") from e
 
-            # Sanitize content after size validation
-            sanitized_content = sanitize_content(str(message.content))
-
             # Count the raw payload the caller supplied. Sanitized sizes are
             # capped per message, so accumulating those would measure message
             # count rather than payload size.
             total_size += raw_content_size
+
+            # Reject before sanitizing this message: the conversation is already
+            # doomed, so sanitizing it would burn work and emit a misleading
+            # truncation warning for content that is never emitted.
+            if total_size > MAX_TOTAL_CONVERSATION_SIZE:
+                raise ContentTooLargeError(
+                    f"Total conversation size exceeds limit: {total_size} bytes"
+                )
+
+            # Sanitize content after size validation
+            sanitized_content, content_truncated = sanitize_content(
+                str(message.content)
+            )
+            if content_truncated:
+                # Losing the tail of a message is a degraded conversion, not a
+                # failure: report it and keep the remaining messages.
+                self.metrics_collector.record_warning(
+                    f"Message {i} content truncated to "
+                    f"{MAX_CONTENT_SANITIZATION_SIZE} characters"
+                )
 
             sanitized_messages.append(
                 replace(
@@ -245,11 +263,6 @@ class MarkdownGenerator:
                     timestamp=clean_timestamp,
                     content=sanitized_content,
                 )
-            )
-
-        if total_size > MAX_TOTAL_CONVERSATION_SIZE:
-            raise ContentTooLargeError(
-                f"Total conversation size exceeds limit: {total_size} bytes"
             )
 
         logger.debug(
