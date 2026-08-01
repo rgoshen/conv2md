@@ -1,10 +1,27 @@
 """Unit tests for Markdown generator."""
 
+import re
 import unittest
 
 from conv2md.domain.models import Conversation, Message, ContentType
+from conv2md.markdown.constants import MAX_CONTENT_SANITIZATION_SIZE
 from conv2md.markdown.generator import MarkdownGenerator
-from conv2md.markdown.exceptions import InvalidContentError, ContentTooLargeError
+from conv2md.markdown.exceptions import (
+    ContentTooLargeError,
+    EncodingError,
+    InvalidContentError,
+)
+
+# Characters sanitization must strip before anything reaches the output.
+CONTROL_CHARACTERS = re.compile(r"[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]")
+
+try:  # pragma: no cover - availability depends on the local environment
+    import yaml
+
+    YAML_AVAILABLE = True
+except ImportError:  # pragma: no cover
+    yaml = None
+    YAML_AVAILABLE = False
 
 
 class TestMarkdownGenerator(unittest.TestCase):
@@ -51,8 +68,8 @@ class TestMarkdownGenerator(unittest.TestCase):
         # Verify YAML frontmatter structure
         lines = result.split("\n")
         self.assertEqual(lines[0], "---")
-        self.assertIn("title: Test Conversation", result)
-        self.assertIn("source: test.json", result)
+        self.assertIn('title: "Test Conversation"', result)
+        self.assertIn('source: "test.json"', result)
 
         # Verify closing frontmatter exists
         self.assertIn("---", lines[1:], "Should have closing --- for frontmatter")
@@ -92,14 +109,14 @@ class TestMarkdownGenerator(unittest.TestCase):
 
         result = self.generator.generate(conversation, metadata=metadata)
 
-        # Verify YAML special characters are handled safely
-        self.assertIn("title: Test\\: malicious content", result)
+        # Verify YAML special characters are handled safely by quoting
+        self.assertIn('title: "Test: malicious content"', result)
         self.assertIn(
-            "description: Contains &quot;quotes&quot; and newlines\\nSecond line",
+            r'description: "Contains \"quotes\" and newlines\nSecond line"',
             result,
         )
-        self.assertIn("tags: value with\\: colon", result)
-        self.assertIn("injection: \\- list item\\n  nested\\: value", result)
+        self.assertIn('tags: "value with: colon"', result)
+        self.assertIn(r'injection: "- list item\n  nested: value"', result)
 
     def test_generate_handles_empty_content(self):
         """Test that empty content is handled properly."""
@@ -216,6 +233,38 @@ class TestMarkdownGenerator(unittest.TestCase):
         self.assertIn("````markdown", result)
         self.assertIn("````", result.split("````markdown")[1])
 
+    def test_generate_emits_sanitized_speaker_timestamp_and_content(self):
+        """Sanitized values, not the raw message, must reach the output."""
+        messages = [
+            Message(
+                speaker="Ali\x07ce",
+                content="line1\r\nline2\x07end",
+                timestamp="12:\x0734",
+            )
+        ]
+        conversation = Conversation(messages=messages)
+
+        result = self.generator.generate(conversation)
+
+        self.assertIsNone(
+            CONTROL_CHARACTERS.search(result),
+            "Output must not contain control characters",
+        )
+        self.assertNotIn("\r", result, "Output must not contain carriage returns")
+        self.assertEqual(result, "**Alice — 12:34**\nline1\nline2end")
+
+    def test_generate_truncates_content_at_sanitization_limit(self):
+        """Content beyond the sanitization cap must not reach the output."""
+        oversized = "x" * (MAX_CONTENT_SANITIZATION_SIZE + 50_000)
+        conversation = Conversation(
+            messages=[Message(speaker="User", content=oversized)]
+        )
+
+        result = self.generator.generate(conversation)
+
+        content_line = result.split("\n")[1]
+        self.assertEqual(len(content_line), MAX_CONTENT_SANITIZATION_SIZE)
+
     def test_validation_empty_conversation(self):
         """Test validation with empty conversation."""
         conversation = Conversation(messages=[])
@@ -276,13 +325,11 @@ class TestMarkdownGenerator(unittest.TestCase):
         with patch(
             "conv2md.markdown.generator.MAX_TOTAL_CONVERSATION_SIZE", 200000
         ):  # 200KB limit
-            # Create multiple messages that individually are under the individual limit
-            # but together exceed the total limit after sanitization
-            # Each message sanitizes to 100KB, so 3 messages = 300KB > 200KB limit
+            # Each message is under the per-message limit, but the raw payload
+            # the caller supplied totals 3 x 150000 = 450000 bytes > 200KB.
             messages = []
             for i in range(3):
-                # Content larger than sanitization limit (truncated to 100KB)
-                content = "x" * 150000  # 150KB content -> sanitized to 100KB each
+                content = "x" * 150000  # 150000 raw bytes each
                 messages.append(Message(speaker=f"User{i}", content=content))
 
             conversation = Conversation(messages=messages)
@@ -291,6 +338,26 @@ class TestMarkdownGenerator(unittest.TestCase):
                 generator.generate(conversation)
 
             self.assertIn("Total conversation size exceeds limit", str(cm.exception))
+            # Raw bytes, not the per-message sanitization cap (3 x 102400)
+            self.assertIn("450000 bytes", str(cm.exception))
+
+    def test_validation_total_size_counts_raw_content_bytes(self):
+        """The total-size guard must bound the payload, not the message count."""
+        from unittest.mock import patch
+
+        generator = MarkdownGenerator()
+
+        # 2 x 150000 = 300000 raw bytes exceeds the 250000 limit, while the
+        # post-truncation sizes (2 x 102400 = 204800) would not.
+        messages = [Message(speaker=f"User{i}", content="x" * 150000) for i in range(2)]
+        conversation = Conversation(messages=messages)
+
+        with patch("conv2md.markdown.generator.MAX_TOTAL_CONVERSATION_SIZE", 250000):
+            with self.assertRaises(ContentTooLargeError) as cm:
+                generator.generate(conversation)
+
+        self.assertIn("Total conversation size exceeds limit", str(cm.exception))
+        self.assertIn("300000 bytes", str(cm.exception))
 
     def test_metrics_collection(self):
         """Test that metrics are collected during generation."""
@@ -363,12 +430,12 @@ class TestMarkdownGenerator(unittest.TestCase):
         result = self.generator.generate(conversation, metadata=metadata)
 
         # Verify sanitization occurred
-        self.assertIn("title: Test\\: Content with\\: colons", result)
-        self.assertIn("malicious: \\- list\\n  injection\\: attempt", result)
-        self.assertIn("quotes: Contains &quot;quotes&quot;", result)
+        self.assertIn('title: "Test: Content with: colons"', result)
+        self.assertIn(r'malicious: "- list\n  injection: attempt"', result)
         self.assertIn(
-            "script: &lt;script&gt;alert(&\\#x27;xss&\\#x27;)&lt;/script&gt;", result
+            r'quotes: "Contains \"quotes\" and newlines\nSecond line"', result
         )
+        self.assertIn("script: \"<script>alert('xss')</script>\"", result)
         # Invalid key should be sanitized and included
         self.assertIn("invalid_key_", result)
 
@@ -390,6 +457,66 @@ class TestMarkdownGenerator(unittest.TestCase):
 
         self.assertIn("Failed to process message 1", str(cm.exception))
         self.assertIn("Mock processing error", str(cm.exception))
+
+    def test_failures_record_exactly_one_error_in_metrics(self):
+        """One failure must increment errors_encountered exactly once."""
+        from unittest.mock import Mock
+
+        failing_pipeline = Mock()
+        failing_pipeline.process_message.side_effect = ValueError("Mock failure")
+
+        scenarios = [
+            (
+                "per-message processing failure",
+                MarkdownGenerator(pipeline=failing_pipeline),
+                Conversation(messages=[Message(speaker="User", content="Test")]),
+            ),
+            (
+                "validation failure",
+                MarkdownGenerator(),
+                Conversation(messages=[Message(speaker="", content="Test")]),
+            ),
+        ]
+
+        for name, generator, conversation in scenarios:
+            with self.subTest(scenario=name):
+                with self.assertRaises(InvalidContentError):
+                    generator.generate(conversation)
+
+                metrics = generator.metrics_collector.current_metrics
+                self.assertEqual(metrics.errors_encountered, 1)
+
+    def test_validation_errors_chain_the_original_exception(self):
+        """Validation failures must preserve the underlying cause."""
+        scenarios = [
+            (
+                "invalid speaker",
+                Message(speaker="\x00\x01", content="Test"),
+                InvalidContentError,
+                ValueError,
+            ),
+            (
+                "invalid timestamp",
+                Message(speaker="User", content="Test", timestamp="not-a-timestamp"),
+                InvalidContentError,
+                ValueError,
+            ),
+            (
+                "unencodable content",
+                Message(speaker="User", content="\ud800"),
+                EncodingError,
+                UnicodeEncodeError,
+            ),
+        ]
+
+        for name, message, error_type, cause_type in scenarios:
+            with self.subTest(scenario=name):
+                conversation = Conversation(messages=[message])
+
+                with self.assertRaises(error_type) as cm:
+                    MarkdownGenerator().generate(conversation)
+
+                self.assertIsInstance(cm.exception.__cause__, cause_type)
 
     def test_unexpected_exceptions_are_not_masked(self):
         """Test that unexpected exceptions like RuntimeError are not caught."""
@@ -418,10 +545,31 @@ class TestMarkdownGenerator(unittest.TestCase):
 
         # Should have opening delimiter, content, closing delimiter, and blank line
         self.assertEqual(result[0], "---")
-        self.assertIn("title: Test Title", result)
-        self.assertIn("source: test.json", result)
+        self.assertIn('title: "Test Title"', result)
+        self.assertIn('source: "test.json"', result)
         self.assertEqual(result[-2], "---")
         self.assertEqual(result[-1], "")  # Blank line after frontmatter
+
+    @unittest.skipUnless(YAML_AVAILABLE, "PyYAML not installed")
+    def test_frontmatter_block_is_parseable_yaml(self):
+        """Generated frontmatter must parse and preserve the original values."""
+        generator = MarkdownGenerator()
+        metadata = {
+            "title": "Chapter 1: Intro",
+            "note": "it's fine",
+            "slug": "well-known",
+            "path": r"C:\Users\x",
+            "quote": 'He said "hi"',
+            "multiline": "line1\nline2",
+        }
+
+        lines = generator._build_frontmatter(metadata)
+        # Drop the delimiters and the trailing blank line
+        document = "\n".join(lines[1:-2])
+
+        parsed = yaml.safe_load(document)
+
+        self.assertEqual(parsed, metadata)
 
     def test_build_message_lines_helper_method(self):
         """Test _build_message_lines helper method directly."""
@@ -468,10 +616,10 @@ class TestMarkdownGenerator(unittest.TestCase):
 
         # Keys should be in alphabetical order
         expected_order = [
-            "aaa_first: first value",
-            "mmm_middle: middle value",
-            "title: Test Title",
-            "zzz_last: last value",
+            'aaa_first: "first value"',
+            'mmm_middle: "middle value"',
+            'title: "Test Title"',
+            'zzz_last: "last value"',
         ]
 
         self.assertEqual(content_lines, expected_order)

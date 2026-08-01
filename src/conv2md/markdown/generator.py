@@ -1,8 +1,9 @@
 """Markdown generator for conversations."""
 
 import logging
+from dataclasses import replace
 from typing import Dict, Any, Optional, List
-from conv2md.domain.models import Conversation
+from conv2md.domain.models import Conversation, Message
 from conv2md.markdown.blocks import format_speaker_line
 from conv2md.markdown.pipeline import ContentProcessingPipeline
 from conv2md.markdown.metrics import MetricsCollector
@@ -60,12 +61,11 @@ class MarkdownGenerator:
         self.metrics_collector.start_conversion()
 
         try:
-            # Validate input
-            self._validate_conversation(conversation)
+            # Validate input and take the sanitized messages it produces, so
+            # the raw message never reaches the output
+            messages = self._validate_conversation(conversation)
 
-            logger.debug(
-                f"Converting {len(conversation.messages)} messages to Markdown"
-            )
+            logger.debug(f"Converting {len(messages)} messages to Markdown")
 
             lines = []
 
@@ -74,7 +74,7 @@ class MarkdownGenerator:
                 lines.extend(self._build_frontmatter(metadata))
 
             # Process all messages
-            lines.extend(self._build_message_lines(conversation.messages))
+            lines.extend(self._build_message_lines(messages))
 
             # Remove trailing blank line
             if lines and lines[-1] == "":
@@ -112,6 +112,7 @@ class MarkdownGenerator:
         lines = ["---"]
         # Sort keys for deterministic output
         for key in sorted(safe_metadata.keys()):
+            # Values arrive as quoted YAML scalars - do not quote them again
             value = safe_metadata[key]
             lines.append(f"{key}: {value}")
         lines.extend(["---", ""])  # Closing delimiter and blank line
@@ -158,18 +159,25 @@ class MarkdownGenerator:
 
             except (ValueError, TypeError, AttributeError) as e:
                 logger.error(f"Error processing message {i + 1}: {e}")
-                self.metrics_collector.record_error(e)
+                # generate() records the error when it catches the re-raise;
+                # recording here as well would double-count one failure
                 raise InvalidContentError(
                     f"Failed to process message {i + 1}: {e}"
                 ) from e
 
         return lines
 
-    def _validate_conversation(self, conversation: Conversation) -> None:
-        """Validate conversation data before processing.
+    def _validate_conversation(self, conversation: Conversation) -> List[Message]:
+        """Validate and sanitize conversation data before processing.
 
         Args:
             conversation: Conversation to validate
+
+        Returns:
+            List of messages whose speaker, timestamp and content have been
+            replaced with their sanitized equivalents. Callers must format
+            these rather than the originals, or every sanitization guarantee
+            is lost.
 
         Raises:
             InvalidContentError: If conversation data is invalid
@@ -183,6 +191,7 @@ class MarkdownGenerator:
             raise InvalidContentError("Conversation must have at least one message")
 
         total_size = 0
+        sanitized_messages: List[Message] = []
 
         for i, message in enumerate(conversation.messages):
             if not message.speaker:
@@ -193,16 +202,19 @@ class MarkdownGenerator:
 
             # Validate and sanitize speaker name
             try:
-                validate_speaker_name(message.speaker)
+                clean_speaker = validate_speaker_name(message.speaker)
             except ValueError as e:
-                raise InvalidContentError(f"Message {i} invalid speaker: {e}")
+                raise InvalidContentError(f"Message {i} invalid speaker: {e}") from e
 
             # Validate timestamp if present
+            clean_timestamp = message.timestamp
             if message.timestamp:
                 try:
-                    validate_timestamp(message.timestamp)
+                    clean_timestamp = validate_timestamp(message.timestamp)
                 except ValueError as e:
-                    raise InvalidContentError(f"Message {i} invalid timestamp: {e}")
+                    raise InvalidContentError(
+                        f"Message {i} invalid timestamp: {e}"
+                    ) from e
 
             # Validate content size BEFORE sanitization to catch large content
             try:
@@ -216,14 +228,24 @@ class MarkdownGenerator:
                     )
 
             except UnicodeEncodeError as e:
-                raise EncodingError(f"Message {i} has encoding issues: {e}")
+                raise EncodingError(f"Message {i} has encoding issues: {e}") from e
 
             # Sanitize content after size validation
             sanitized_content = sanitize_content(str(message.content))
 
-            # Add sanitized content size to total
-            sanitized_size = len(sanitized_content.encode("utf-8"))
-            total_size += sanitized_size
+            # Count the raw payload the caller supplied. Sanitized sizes are
+            # capped per message, so accumulating those would measure message
+            # count rather than payload size.
+            total_size += raw_content_size
+
+            sanitized_messages.append(
+                replace(
+                    message,
+                    speaker=clean_speaker,
+                    timestamp=clean_timestamp,
+                    content=sanitized_content,
+                )
+            )
 
         if total_size > MAX_TOTAL_CONVERSATION_SIZE:
             raise ContentTooLargeError(
@@ -234,3 +256,5 @@ class MarkdownGenerator:
             f"Conversation validation passed: {len(conversation.messages)} "
             f"messages, {total_size} bytes"
         )
+
+        return sanitized_messages

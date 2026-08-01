@@ -1,7 +1,8 @@
 """Security controls for markdown generation."""
 
+import logging
 import re
-import html
+from datetime import datetime
 from typing import Dict, Any
 from conv2md.markdown.constants import (
     MAX_METADATA_VALUE_LENGTH,
@@ -9,6 +10,17 @@ from conv2md.markdown.constants import (
     MAX_TIMESTAMP_LENGTH,
     MAX_CONTENT_SANITIZATION_SIZE,
 )
+
+logger = logging.getLogger(__name__)
+
+# Control characters that must never reach the output. Newline (\x0A), carriage
+# return (\x0D) and tab (\x09) are deliberately excluded: they carry meaning and
+# are escaped rather than dropped.
+CONTROL_CHARACTERS = re.compile(r"[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]")
+
+# Calendar date with bounded month and day fields. Field bounds alone cannot
+# reject dates such as 2024-02-30, so callers also confirm with the calendar.
+_DATE_PATTERN = r"\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])"
 
 
 def sanitize_yaml_metadata(metadata: Dict[str, Any]) -> Dict[str, Any]:
@@ -18,7 +30,7 @@ def sanitize_yaml_metadata(metadata: Dict[str, Any]) -> Dict[str, Any]:
         metadata: Raw metadata dictionary
 
     Returns:
-        Sanitized metadata dictionary
+        Sanitized metadata dictionary mapping clean keys to quoted YAML scalars
     """
     sanitized = {}
 
@@ -28,6 +40,17 @@ def sanitize_yaml_metadata(metadata: Dict[str, Any]) -> Dict[str, Any]:
         if not clean_key:
             continue  # Skip invalid keys
 
+        # Stripping disallowed characters can map distinct keys onto the same
+        # name (e.g. "title#1" and "title1"). Losing a field silently would
+        # hide data from the caller, so warn but keep the last value wins rule.
+        if clean_key in sanitized:
+            logger.warning(
+                "Metadata key %r collides with an existing key %r after "
+                "sanitization; the previous value is being overwritten",
+                str(key),
+                clean_key,
+            )
+
         # Sanitize value
         clean_value = sanitize_yaml_value(value)
         sanitized[clean_key] = clean_value
@@ -36,38 +59,34 @@ def sanitize_yaml_metadata(metadata: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def sanitize_yaml_value(value: Any) -> str:
-    """Sanitize a value for safe YAML output.
+    """Sanitize a value into a double-quoted YAML scalar.
+
+    Quoting - rather than escaping metacharacters in a plain scalar - is what
+    makes the output parseable: backslash has no escape meaning in a YAML plain
+    scalar, so values containing ": ", "#" or a leading "-" can only be
+    represented safely inside quotes.
 
     Args:
         value: Value to sanitize
 
     Returns:
-        Sanitized string value safe for YAML
+        A double-quoted YAML scalar, including the surrounding quotes
     """
-    # Convert to string and limit length
+    # Convert to string and limit length before escaping, so the cap applies to
+    # the caller's input rather than to the escape sequences we add.
     str_value = str(value)[:MAX_METADATA_VALUE_LENGTH]
 
-    # HTML escape first to prevent injection
-    str_value = html.escape(str_value)
+    # Drop characters that a double-quoted scalar cannot carry verbatim
+    str_value = CONTROL_CHARACTERS.sub("", str_value)
 
-    # Escape YAML special characters
-    str_value = str_value.replace("\\", "\\\\")  # Escape backslashes first
-    str_value = str_value.replace(":", "\\:")
+    # Backslash first, so the escapes added below are not themselves escaped
+    str_value = str_value.replace("\\", "\\\\")
     str_value = str_value.replace('"', '\\"')
-    str_value = str_value.replace("'", "\\'")
     str_value = str_value.replace("\n", "\\n")
     str_value = str_value.replace("\r", "\\r")
     str_value = str_value.replace("\t", "\\t")
-    str_value = str_value.replace("-", "\\-")  # Prevent list interpretation
-    str_value = str_value.replace("#", "\\#")  # Prevent comment interpretation
-    str_value = str_value.replace("|", "\\|")  # Prevent literal block
-    str_value = str_value.replace(">", "\\>")  # Prevent folded block
-    str_value = str_value.replace("[", "\\[")  # Prevent array
-    str_value = str_value.replace("]", "\\]")
-    str_value = str_value.replace("{", "\\{")  # Prevent object
-    str_value = str_value.replace("}", "\\}")
 
-    return str_value
+    return f'"{str_value}"'
 
 
 def sanitize_content(content: str) -> str:
@@ -86,7 +105,7 @@ def sanitize_content(content: str) -> str:
     content = content[:MAX_CONTENT_SANITIZATION_SIZE]
 
     # Remove null bytes and other control characters (except newlines and tabs)
-    content = re.sub(r"[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]", "", content)
+    content = CONTROL_CHARACTERS.sub("", content)
 
     # Normalize line endings
     content = content.replace("\r\n", "\n").replace("\r", "\n")
@@ -148,7 +167,7 @@ def validate_timestamp(timestamp: str) -> str:
     # Improved validation for common timestamp formats
     # Pattern 1: ISO8601 formats (2024-08-18T14:30:00Z, etc.)
     iso8601_pattern = (
-        r"^\d{4}-\d{2}-\d{2}(?:T(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d"
+        rf"^{_DATE_PATTERN}(?:T(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d"
         r"(?:\.\d+)?(?:[+-]\d{2}:\d{2}|Z)?)?$"
     )
 
@@ -161,15 +180,27 @@ def validate_timestamp(timestamp: str) -> str:
     unix_pattern = r"^\d{10}(?:\.\d{1,6})?$"
 
     # Pattern 4: Human readable with spaces (2024-08-18 14:30:00)
-    human_readable_pattern = r"^\d{4}-\d{2}-\d{2}\s+(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d$"
+    human_readable_pattern = rf"^{_DATE_PATTERN}\s+(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d$"
+
+    has_calendar_date = bool(
+        re.match(iso8601_pattern, timestamp)
+        or re.match(human_readable_pattern, timestamp)
+    )
 
     if not (
-        re.match(iso8601_pattern, timestamp)
+        has_calendar_date
         or re.match(time_24h_pattern, timestamp)
         or re.match(time_12h_pattern, timestamp)
         or re.match(unix_pattern, timestamp)
-        or re.match(human_readable_pattern, timestamp)
     ):
         raise ValueError(f"Invalid timestamp format: {timestamp}")
+
+    if has_calendar_date:
+        # Field bounds accept dates the calendar does not, such as 2024-02-30
+        # or 2023-02-29. Only the calendar itself can settle those.
+        try:
+            datetime.strptime(timestamp[:10], "%Y-%m-%d")
+        except ValueError as error:
+            raise ValueError(f"Invalid timestamp format: {timestamp}") from error
 
     return timestamp
