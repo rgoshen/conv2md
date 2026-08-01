@@ -1,6 +1,7 @@
 """Unit tests for Markdown blocks functionality."""
 
 import unittest
+from conv2md.domain.models import ContentType, Message
 from conv2md.markdown.blocks import (
     determine_fence_length,
     create_code_block,
@@ -8,6 +9,7 @@ from conv2md.markdown.blocks import (
     format_speaker_line,
     create_date_marker,
 )
+from conv2md.markdown.pipeline import ImageContentProcessor, TextContentProcessor
 
 
 class TestMarkdownBlocks(unittest.TestCase):
@@ -86,9 +88,9 @@ class TestMarkdownBlocks(unittest.TestCase):
 
     def test_escape_markdown_content_all_special_chars(self):
         """Test escaping all markdown special characters."""
-        text = "\\`*_{}[]()#+-.!|"
+        text = "\\`*_{}[]()#+-.!|=>"
         result = escape_markdown_content(text)
-        expected = "\\\\\\`\\*\\_\\{\\}\\[\\]\\(\\)\\#\\+\\-\\.\\!\\|"
+        expected = "\\\\\\`\\*\\_\\{\\}\\[\\]\\(\\)\\#\\+\\-\\.\\!\\|\\=\\>"
         self.assertEqual(result, expected)
 
     def test_format_speaker_line_simple(self):
@@ -197,6 +199,116 @@ class TestCodeBlockLanguageValidation(unittest.TestCase):
 
         self.assertEqual(result, f"````\n{content}\n````")
         self.assertNotIn("FORGED", result)
+
+
+class TestBlockOpenerEscaping(unittest.TestCase):
+    """Test that content cannot spell a block-level Markdown opener."""
+
+    def test_block_openers_are_escaped(self):
+        """Setext underlines and blockquote markers survive as literal text."""
+        cases = [
+            ("setext h1 underline", "===", "\\=\\=\\="),
+            ("setext h2 underline", "---", "\\-\\-\\-"),
+            ("blockquote", "> text", "\\> text"),
+            ("nested blockquote", ">> text", "\\>\\> text"),
+            ("lazy setext heading", "Title\n===", "Title\n\\=\\=\\="),
+            ("prose equals", "x = 1", "x \\= 1"),
+            ("prose greater than", "a > b", "a \\> b"),
+        ]
+
+        for description, content, expected in cases:
+            with self.subTest(case=description):
+                self.assertEqual(escape_markdown_content(content), expected)
+
+    def test_speaker_line_escapes_block_openers(self):
+        """format_speaker_line inherits the widened escape set."""
+        result = format_speaker_line("> Bot", "12:00 => 13:00")
+        self.assertEqual(result, "**\\> Bot — 12:00 \\=\\> 13:00**")
+
+    def test_text_processor_escapes_block_openers(self):
+        """TextContentProcessor inherits the widened escape set."""
+        message = Message(speaker="User", content="> quoted\n===")
+        result = TextContentProcessor().process(message)
+        self.assertEqual(result, "\\> quoted\n\\=\\=\\=")
+
+    def test_image_processor_escapes_block_openers(self):
+        """ImageContentProcessor inherits the widened escape set."""
+        message = Message(
+            speaker="User",
+            content="a=b>c.png",
+            content_type=ContentType.IMAGE,
+        )
+        result = ImageContentProcessor().process(message)
+        self.assertEqual(result, "![Image](a\\=b\\>c\\.png)")
+
+
+class TestDateMarkerHardening(unittest.TestCase):
+    """Test that create_date_marker confines input to the heading."""
+
+    def test_line_breaks_cannot_escape_the_heading(self):
+        """Every Unicode line break collapses to a space, keeping one line."""
+        cases = [
+            ("newline", "2024-01-01\n# Forged", "## 2024-01-01 \\# Forged"),
+            ("carriage return", "2024-01-01\r# Forged", "## 2024-01-01 \\# Forged"),
+            ("crlf", "2024-01-01\r\n# Forged", "## 2024-01-01 \\# Forged"),
+            ("blank line", "2024-01-01\n\ntext", "## 2024-01-01 text"),
+            ("line separator", "2024-01-01\u2028text", "## 2024-01-01 text"),
+            ("paragraph separator", "2024-01-01\u2029text", "## 2024-01-01 text"),
+            ("vertical tab", "2024-01-01\vtext", "## 2024-01-01 text"),
+            ("form feed", "2024-01-01\ftext", "## 2024-01-01 text"),
+            ("next line", "2024-01-01\x85text", "## 2024-01-01 text"),
+        ]
+
+        for description, date_str, expected in cases:
+            with self.subTest(case=description):
+                result = create_date_marker(date_str)
+                self.assertEqual(result, expected)
+                self.assertEqual(len(result.splitlines()), 1)
+
+    def test_code_fence_injection_stays_inside_the_heading(self):
+        """A fenced block smuggled through a newline cannot open a block."""
+        result = create_date_marker("2024-01-01\n\n```\nrm -rf /\n```")
+
+        self.assertEqual(len(result.splitlines()), 1)
+        self.assertTrue(result.startswith("## "))
+        self.assertEqual(result, "## 2024-01-01 ``` rm -rf / ```")
+
+    def test_backslashes_cannot_defeat_the_escapes(self):
+        """A caller backslash is escaped first so it cannot re-arm markup."""
+        cases = [
+            ("bare backslash", "2024\\01", "## 2024\\\\01"),
+            ("trailing backslash", "2024-01-01\\", "## 2024-01-01\\\\"),
+            ("backslash before star", "a\\*b*c", "## a\\\\\\*b\\*c"),
+            ("backslash before hash", "\\#Forged", "## \\\\\\#Forged"),
+            ("double backslash", "a\\\\b", "## a\\\\\\\\b"),
+        ]
+
+        for description, date_str, expected in cases:
+            with self.subTest(case=description):
+                self.assertEqual(create_date_marker(date_str), expected)
+
+    def test_non_date_input_renders_as_heading_text(self):
+        """Arbitrary values still render, but only ever as heading text."""
+        cases = [
+            ("empty", "", "## "),
+            ("whitespace only", "   \n\t ", "## "),
+            ("surrounding whitespace", "  2024-01-01  ", "## 2024-01-01"),
+            ("not a date", "tomorrow", "## tomorrow"),
+            ("heading marker", "###### deep", "## \\#\\#\\#\\#\\#\\# deep"),
+            ("emphasis", "2024*01*01", "## 2024\\*01\\*01"),
+            ("underscores", "2024_01_01", "## 2024\\_01\\_01"),
+            ("path traversal", "../../etc/passwd", "## ../../etc/passwd"),
+        ]
+
+        for description, date_str, expected in cases:
+            with self.subTest(case=description):
+                self.assertEqual(create_date_marker(date_str), expected)
+
+    def test_date_marker_is_deterministic(self):
+        """Repeated calls on hostile input produce identical output."""
+        date_str = "2024-01-01\n\n# Forged\\*"
+        results = {create_date_marker(date_str) for _ in range(5)}
+        self.assertEqual(len(results), 1)
 
 
 class TestDeterministicOutput(unittest.TestCase):

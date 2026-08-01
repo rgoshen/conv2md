@@ -2,10 +2,17 @@
 
 import unittest
 
-from conv2md.markdown.constants import MAX_METADATA_VALUE_LENGTH
+from conv2md.markdown.constants import (
+    MAX_CONTENT_SANITIZATION_SIZE,
+    MAX_METADATA_VALUE_LENGTH,
+    MAX_SPEAKER_NAME_LENGTH,
+    MAX_TIMESTAMP_LENGTH,
+)
 from conv2md.markdown.security import (
+    sanitize_content,
     sanitize_yaml_metadata,
     sanitize_yaml_value,
+    validate_speaker_name,
     validate_timestamp,
 )
 
@@ -147,6 +154,125 @@ class TestMetadataKeySanitization(unittest.TestCase):
         self.assertEqual(result, {"ok": '"kept"'})
 
 
+class TestSpeakerNameValidation(unittest.TestCase):
+    """Test speaker name validation directly, not through the generator."""
+
+    def test_rejects_input_with_no_usable_characters(self):
+        """Empty, blank and control-only names raise with a specific message."""
+        cases = [
+            # (description, raw speaker, expected message fragment)
+            ("empty string", "", "cannot be empty"),
+            ("spaces only", "   ", "cannot be empty"),
+            ("tabs and newlines only", "\t\n\r", "cannot be empty"),
+            # \x0B and \x0C are whitespace to str.strip(), so they are caught by
+            # the emptiness check rather than the control-character check.
+            ("vertical tab and form feed only", "\x0b\x0c", "cannot be empty"),
+            ("control characters only", "\x00\x01\x02", "only invalid characters"),
+            ("delete character only", "\x7f", "only invalid characters"),
+        ]
+
+        for description, raw, expected_fragment in cases:
+            with self.subTest(case=description):
+                with self.assertRaises(ValueError) as caught:
+                    validate_speaker_name(raw)
+                self.assertIn(expected_fragment, str(caught.exception))
+
+    def test_accepts_and_cleans_valid_names(self):
+        """Surrounding whitespace is stripped and control bytes are dropped."""
+        cases = [
+            # (description, raw speaker, expected result)
+            ("plain", "Alice", "Alice"),
+            ("surrounding whitespace", "  Alice  ", "Alice"),
+            ("embedded null byte", "Al\x00ice", "Alice"),
+            ("embedded newline", "Al\nice", "Alice"),
+            ("embedded tab", "Al\tice", "Alice"),
+            ("embedded delete", "Al\x7fice", "Alice"),
+            ("internal spaces kept", "Dr. Jane Doe", "Dr. Jane Doe"),
+            ("unicode kept", "Ana Lopez", "Ana Lopez"),
+        ]
+
+        for description, raw, expected in cases:
+            with self.subTest(case=description):
+                self.assertEqual(validate_speaker_name(raw), expected)
+
+    def test_truncates_names_beyond_the_length_limit(self):
+        """Over-long names are cut to MAX_SPEAKER_NAME_LENGTH."""
+        result = validate_speaker_name("a" * (MAX_SPEAKER_NAME_LENGTH + 50))
+        self.assertEqual(result, "a" * MAX_SPEAKER_NAME_LENGTH)
+
+    def test_name_at_the_length_limit_is_untouched(self):
+        """A name of exactly the limit survives intact."""
+        exact = "b" * MAX_SPEAKER_NAME_LENGTH
+        self.assertEqual(validate_speaker_name(exact), exact)
+
+
+class TestContentSanitization(unittest.TestCase):
+    """Test content sanitization, including its truncation boundary."""
+
+    def test_empty_content_reports_no_truncation(self):
+        """Falsy content short-circuits to an empty, untruncated result."""
+        self.assertEqual(sanitize_content(""), ("", False))
+
+    def test_truncation_boundary(self):
+        """Truncation begins only past MAX_CONTENT_SANITIZATION_SIZE."""
+        cases = [
+            # (description, input length, expected truncated flag)
+            ("one below the limit", MAX_CONTENT_SANITIZATION_SIZE - 1, False),
+            ("exactly at the limit", MAX_CONTENT_SANITIZATION_SIZE, False),
+            ("one above the limit", MAX_CONTENT_SANITIZATION_SIZE + 1, True),
+            ("far above the limit", MAX_CONTENT_SANITIZATION_SIZE * 2, True),
+        ]
+
+        for description, length, expected_truncated in cases:
+            with self.subTest(case=description):
+                content, truncated = sanitize_content("a" * length)
+                self.assertEqual(truncated, expected_truncated)
+                self.assertEqual(
+                    len(content), min(length, MAX_CONTENT_SANITIZATION_SIZE)
+                )
+                self.assertEqual(content, "a" * len(content))
+
+    def test_strips_control_characters_but_keeps_whitespace(self):
+        """Control bytes are dropped; newline and tab carry meaning and stay."""
+        cases = [
+            # (description, raw content, expected content)
+            ("null byte", "a\x00b", "ab"),
+            ("start of heading", "a\x01b", "ab"),
+            ("vertical tab", "a\x0bb", "ab"),
+            ("form feed", "a\x0cb", "ab"),
+            ("delete", "a\x7fb", "ab"),
+            ("newline kept", "a\nb", "a\nb"),
+            ("tab kept", "a\tb", "a\tb"),
+        ]
+
+        for description, raw, expected in cases:
+            with self.subTest(case=description):
+                self.assertEqual(sanitize_content(raw), (expected, False))
+
+    def test_normalizes_line_endings(self):
+        """CRLF and lone CR both collapse to LF."""
+        cases = [
+            ("crlf", "a\r\nb", "a\nb"),
+            ("lone cr", "a\rb", "a\nb"),
+            ("mixed", "a\r\nb\rc\nd", "a\nb\nc\nd"),
+            ("trailing crlf", "a\r\n", "a\n"),
+        ]
+
+        for description, raw, expected in cases:
+            with self.subTest(case=description):
+                self.assertEqual(sanitize_content(raw), (expected, False))
+
+    def test_crlf_split_by_truncation_leaves_no_stray_carriage_return(self):
+        """A CRLF pair cut in half must not surface a lone CR in the output."""
+        # Place "\r" at the last kept index and "\n" just past the cut.
+        raw = "a" * (MAX_CONTENT_SANITIZATION_SIZE - 1) + "\r\n" + "bbbb"
+        content, truncated = sanitize_content(raw)
+
+        self.assertTrue(truncated)
+        self.assertNotIn("\r", content)
+        self.assertTrue(content.endswith("a\n"))
+
+
 class TestTimestampValidation(unittest.TestCase):
     """Test timestamp validation functionality."""
 
@@ -260,7 +386,7 @@ class TestTimestampValidation(unittest.TestCase):
         # Very long valid timestamp should be truncated but still valid
         long_valid_timestamp = "2024-08-18T14:30:00.123456789012345678901234567890Z"
         result = validate_timestamp(long_valid_timestamp)
-        self.assertLessEqual(len(result), 50)  # MAX_TIMESTAMP_LENGTH
+        self.assertLessEqual(len(result), MAX_TIMESTAMP_LENGTH)
 
         # Long invalid timestamp should fail validation
         long_invalid_timestamp = "2024-08-18T14:30:00Z" + "x" * 100

@@ -9,6 +9,10 @@ from typing import Optional
 # allowed; the length cap keeps an oversized tag out of the header.
 LANGUAGE_TAG_PATTERN = re.compile(r"[A-Za-z0-9_+#.-]{1,32}")
 
+# Characters escaped inside a date marker heading, backslash first so the
+# escapes added for the rest cannot themselves be re-escaped or defeated.
+DATE_MARKER_ESCAPE_CHARS = ("\\", "#", "*", "_")
+
 
 def determine_fence_length(content: str, min_length: int = 3) -> int:
     """Determine appropriate fence length for code block content.
@@ -76,8 +80,14 @@ def escape_markdown_content(text: str) -> str:
     Returns:
         Text with Markdown special characters escaped
     """
-    # Escape Markdown special characters: \ ` * _ { } [ ] ( ) # + - . ! |
-    escape_chars = "\\`*_{}[]()#+-.!|"
+    # "\" must stay first: the escapes added below are themselves backslashes,
+    # so escaping it later would double-escape them.
+    # "=" and ">" are block-level openers that ordinary content can otherwise
+    # spell by accident or on purpose: "===" on the line under text makes a
+    # setext heading, and a leading ">" makes a blockquote. ("-", the setext
+    # level-2 form, is already covered.) Both are ASCII punctuation, so the
+    # backslash escape renders them as the literal characters the author wrote.
+    escape_chars = "\\`*_{}[]()#+-.!|=>"
     for char in escape_chars:
         text = text.replace(char, f"\\{char}")
     return text
@@ -106,12 +116,24 @@ def create_date_marker(date_str: str) -> str:
     """Create a date marker heading.
 
     Args:
-        date_str: Date string in YYYY-MM-DD format
+        date_str: Date string in YYYY-MM-DD format. Values that are not dates
+            are still rendered, but only ever as heading text: a heading ends
+            at the first line break, so any line break in the value would let
+            the remainder render as arbitrary block-level Markdown.
 
     Returns:
         Formatted date marker as level 2 heading
     """
-    # For date markers, we don't need to escape hyphens since they're in heading context
-    # Only escape truly problematic characters for headings
-    safe_date = date_str.replace("#", "\\#").replace("*", "\\*").replace("_", "\\_")
+    # str.split() with no argument splits on every Unicode whitespace run,
+    # which covers "\n", "\r\n", "\v", "\f", NEL and U+2028/U+2029 - so the
+    # value collapses onto the single line the heading occupies, and leading
+    # and trailing whitespace is dropped.
+    safe_date = " ".join(date_str.split())
+
+    # Hyphens need no escaping in heading context, so the date form survives
+    # unchanged. "\" is escaped first: without it a caller-supplied backslash
+    # would pair with the escapes below and turn them back into live markup.
+    for char in DATE_MARKER_ESCAPE_CHARS:
+        safe_date = safe_date.replace(char, f"\\{char}")
+
     return f"## {safe_date}"
