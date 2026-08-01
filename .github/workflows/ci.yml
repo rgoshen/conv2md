@@ -6,6 +6,14 @@ on:
   pull_request:
     branches: [ main, develop ]
 
+# Least privilege for every job in this workflow. Lint, test, security scan and
+# build only ever read the repository: the Codecov upload authenticates to
+# Codecov rather than to GitHub, and truffleHog scans the checked-out tree.
+# Declaring this here stops the workflow inheriting the repository default,
+# which may grant write scopes to GITHUB_TOKEN.
+permissions:
+  contents: read
+
 env:
   PYTHON_VERSION: '3.13'
 
