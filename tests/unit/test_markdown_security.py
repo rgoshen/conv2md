@@ -16,7 +16,7 @@ class TestTimestampValidation(unittest.TestCase):
             "2024-08-18 14:30:00",
             "2024-08-18",
         ]
-        
+
         for timestamp in valid_timestamps:
             with self.subTest(timestamp=timestamp):
                 result = validate_timestamp(timestamp)
@@ -31,7 +31,7 @@ class TestTimestampValidation(unittest.TestCase):
             "2:30 AM",
             "02:30:45",
         ]
-        
+
         for timestamp in valid_timestamps:
             with self.subTest(timestamp=timestamp):
                 result = validate_timestamp(timestamp)
@@ -43,7 +43,7 @@ class TestTimestampValidation(unittest.TestCase):
             "1692364200",  # Unix timestamp
             "1692364200.123",  # Unix with milliseconds
         ]
-        
+
         for timestamp in valid_timestamps:
             with self.subTest(timestamp=timestamp):
                 result = validate_timestamp(timestamp)
@@ -55,12 +55,12 @@ class TestTimestampValidation(unittest.TestCase):
             "not-a-timestamp",
             "abcd-ef-gh",
             "2024/13/40",  # Invalid date
-            "25:00:00",   # Invalid time
+            "25:00:00",  # Invalid time
             "random text",
             "javascript:alert(1)",  # Security test
             "<script>alert(1)</script>",  # XSS attempt
         ]
-        
+
         for timestamp in invalid_timestamps:
             with self.subTest(timestamp=timestamp):
                 with self.assertRaises(ValueError):
@@ -70,15 +70,15 @@ class TestTimestampValidation(unittest.TestCase):
         """Test edge cases for timestamp validation."""
         # Empty string should return empty
         self.assertEqual(validate_timestamp(""), "")
-        
+
         # Whitespace only should return empty
         self.assertEqual(validate_timestamp("   "), "")
-        
+
         # Very long valid timestamp should be truncated but still valid
         long_valid_timestamp = "2024-08-18T14:30:00.123456789012345678901234567890Z"
         result = validate_timestamp(long_valid_timestamp)
         self.assertTrue(len(result) <= 50)  # MAX_TIMESTAMP_LENGTH
-        
+
         # Long invalid timestamp should fail validation
         long_invalid_timestamp = "2024-08-18T14:30:00Z" + "x" * 100
         with self.assertRaises(ValueError):

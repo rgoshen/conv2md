@@ -136,13 +136,12 @@ class MarkdownGenerator:
             try:
                 # Format each message with enhanced speaker line and content handling
                 logger.debug(
-                    f"Formatting message {i + 1}: {message.speaker} ({message.content_type.value})"
+                    f"Formatting message {i + 1}: {message.speaker} "
+                    f"({message.content_type.value})"
                 )
 
                 # Create speaker line with optional timestamp
-                speaker_line = format_speaker_line(
-                    message.speaker, message.timestamp
-                )
+                speaker_line = format_speaker_line(message.speaker, message.timestamp)
                 lines.append(speaker_line)
 
                 # Process content using the pipeline

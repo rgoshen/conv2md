@@ -185,9 +185,9 @@ class TestMarkdownGenerator(unittest.TestCase):
         """Test generation with image content containing special markdown characters."""
         messages = [
             Message(
-                speaker="User", 
-                content="my_image[1].png*special*.jpg", 
-                content_type=ContentType.IMAGE
+                speaker="User",
+                content="my_image[1].png*special*.jpg",
+                content_type=ContentType.IMAGE,
             )
         ]
         conversation = Conversation(messages=messages)
@@ -266,29 +266,30 @@ class TestMarkdownGenerator(unittest.TestCase):
         self.assertIn("exceeds size limit", str(cm.exception))
 
     def test_validation_total_conversation_size_exceeds_limit(self):
-        """Test validation when total conversation size exceeds limit with multiple messages."""
+        """Test validation when total size exceeds limit across multiple messages."""
         # Import constants and patch for testing
         from unittest.mock import patch
-        from conv2md.markdown.constants import MAX_TOTAL_CONVERSATION_SIZE
-        
+
         # Create a generator and patch the constant for testing
         generator = MarkdownGenerator()
-        
-        with patch('conv2md.markdown.generator.MAX_TOTAL_CONVERSATION_SIZE', 200000):  # 200KB limit
+
+        with patch(
+            "conv2md.markdown.generator.MAX_TOTAL_CONVERSATION_SIZE", 200000
+        ):  # 200KB limit
             # Create multiple messages that individually are under the individual limit
             # but together exceed the total limit after sanitization
-            # Each message will be sanitized to 100KB, so 3 messages = 300KB > 200KB limit
+            # Each message sanitizes to 100KB, so 3 messages = 300KB > 200KB limit
             messages = []
             for i in range(3):
-                # Create content larger than sanitization limit (will be truncated to 100KB)
+                # Content larger than sanitization limit (truncated to 100KB)
                 content = "x" * 150000  # 150KB content -> sanitized to 100KB each
                 messages.append(Message(speaker=f"User{i}", content=content))
-            
+
             conversation = Conversation(messages=messages)
 
             with self.assertRaises(ContentTooLargeError) as cm:
                 generator.generate(conversation)
-            
+
             self.assertIn("Total conversation size exceeds limit", str(cm.exception))
 
     def test_metrics_collection(self):
@@ -343,7 +344,7 @@ class TestMarkdownGenerator(unittest.TestCase):
         # All results should be identical
         first_result = results[0]
         for i, result in enumerate(results[1:], 1):
-            self.assertEqual(result, first_result, f"Run {i+1} differs from run 1")
+            self.assertEqual(result, first_result, f"Run {i + 1} differs from run 1")
 
     def test_enhanced_yaml_frontmatter_sanitization(self):
         """Test enhanced YAML frontmatter with security sanitization."""
@@ -374,47 +375,47 @@ class TestMarkdownGenerator(unittest.TestCase):
     def test_specific_exception_handling_in_message_processing(self):
         """Test that only specific exceptions are caught during message processing."""
         from unittest.mock import Mock
-        
+
         # Test that ValueError (a processing error) is caught and converted
         mock_pipeline = Mock()
         mock_pipeline.process_message.side_effect = ValueError("Mock processing error")
-        
+
         generator = MarkdownGenerator(pipeline=mock_pipeline)
         messages = [Message(speaker="User", content="Test")]
         conversation = Conversation(messages=messages)
-        
+
         # Should catch ValueError and convert to InvalidContentError
         with self.assertRaises(InvalidContentError) as cm:
             generator.generate(conversation)
-        
+
         self.assertIn("Failed to process message 1", str(cm.exception))
         self.assertIn("Mock processing error", str(cm.exception))
 
     def test_unexpected_exceptions_are_not_masked(self):
         """Test that unexpected exceptions like RuntimeError are not caught."""
         from unittest.mock import Mock
-        
+
         # Create a mock pipeline that raises an unexpected exception
         mock_pipeline = Mock()
         mock_pipeline.process_message.side_effect = RuntimeError("Unexpected error")
-        
+
         generator = MarkdownGenerator(pipeline=mock_pipeline)
         messages = [Message(speaker="User", content="Test")]
         conversation = Conversation(messages=messages)
-        
+
         # RuntimeError should NOT be caught - it should bubble up
         with self.assertRaises(RuntimeError) as cm:
             generator.generate(conversation)
-        
+
         self.assertIn("Unexpected error", str(cm.exception))
 
     def test_build_frontmatter_helper_method(self):
         """Test _build_frontmatter helper method directly."""
         generator = MarkdownGenerator()
         metadata = {"title": "Test Title", "source": "test.json"}
-        
+
         result = generator._build_frontmatter(metadata)
-        
+
         # Should have opening delimiter, content, closing delimiter, and blank line
         self.assertEqual(result[0], "---")
         self.assertIn("title: Test Title", result)
@@ -427,11 +428,11 @@ class TestMarkdownGenerator(unittest.TestCase):
         generator = MarkdownGenerator()
         messages = [
             Message(speaker="User", content="Hello"),
-            Message(speaker="Bot", content="Hi there!")
+            Message(speaker="Bot", content="Hi there!"),
         ]
-        
+
         result = generator._build_message_lines(messages)
-        
+
         # Should have speaker lines, content lines, and blank lines
         self.assertIn("**User:**", result)
         self.assertIn("Hello", result)
@@ -441,18 +442,18 @@ class TestMarkdownGenerator(unittest.TestCase):
         self.assertIn("", result)
 
     def test_frontmatter_keys_are_sorted_deterministically(self):
-        """Test that metadata keys in frontmatter are sorted for deterministic output."""
+        """Test that frontmatter metadata keys are sorted for deterministic output."""
         generator = MarkdownGenerator()
         # Create metadata with keys in non-alphabetical order
         metadata = {
             "zzz_last": "last value",
-            "aaa_first": "first value", 
+            "aaa_first": "first value",
             "mmm_middle": "middle value",
-            "title": "Test Title"
+            "title": "Test Title",
         }
-        
+
         result = generator._build_frontmatter(metadata)
-        
+
         # Find the frontmatter content (between the --- delimiters)
         content_lines = []
         in_frontmatter = False
@@ -464,15 +465,15 @@ class TestMarkdownGenerator(unittest.TestCase):
                     in_frontmatter = True  # Start of frontmatter
             elif in_frontmatter:
                 content_lines.append(line)
-        
+
         # Keys should be in alphabetical order
         expected_order = [
             "aaa_first: first value",
-            "mmm_middle: middle value", 
+            "mmm_middle: middle value",
             "title: Test Title",
-            "zzz_last: last value"
+            "zzz_last: last value",
         ]
-        
+
         self.assertEqual(content_lines, expected_order)
 
 
