@@ -39,8 +39,11 @@ jobs:
           black --check --diff src/ tests/
           
       - name: Lint with flake8
+        # Config lives in .flake8 so local and CI runs cannot diverge. Inline
+        # --ignore would override flake8's defaults and re-enable E226/W504,
+        # which Black's formatting intentionally violates.
         run: |
-          flake8 src/ tests/ --max-line-length=88 --select=E,W,F --ignore=E203,W503
+          flake8 src/ tests/
 
   tests:
     name: 'Tests'
