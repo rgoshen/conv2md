@@ -6,6 +6,14 @@ on:
   pull_request:
     branches: [ main, develop ]
 
+# Least privilege for every job in this workflow. Lint, test, security scan and
+# build only ever read the repository: the Codecov upload authenticates to
+# Codecov rather than to GitHub, and truffleHog scans the checked-out tree.
+# Declaring this here stops the workflow inheriting the repository default,
+# which may grant write scopes to GITHUB_TOKEN.
+permissions:
+  contents: read
+
 env:
   PYTHON_VERSION: '3.13'
 
@@ -39,8 +47,11 @@ jobs:
           black --check --diff src/ tests/
           
       - name: Lint with flake8
+        # Config lives in .flake8 so local and CI runs cannot diverge. Inline
+        # --ignore would override flake8's defaults and re-enable E226/W504,
+        # which Black's formatting intentionally violates.
         run: |
-          flake8 src/ tests/ --max-line-length=88 --select=E,W,F --ignore=E203,W503
+          flake8 src/ tests/
 
   tests:
     name: 'Tests'
