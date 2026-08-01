@@ -3,6 +3,12 @@
 import re
 from typing import Optional
 
+# Info strings are interpolated verbatim into the opening fence, so an
+# unvalidated language can close its own fence and inject Markdown that renders
+# outside the code block. Only the characters real language tags use are
+# allowed; the length cap keeps an oversized tag out of the header.
+LANGUAGE_TAG_PATTERN = re.compile(r"[A-Za-z0-9_+#.-]{1,32}")
+
 
 def determine_fence_length(content: str, min_length: int = 3) -> int:
     """Determine appropriate fence length for code block content.
@@ -38,7 +44,9 @@ def create_code_block(content: str, language: Optional[str] = None) -> str:
 
     Args:
         content: Code content to fence
-        language: Optional language identifier for syntax highlighting
+        language: Optional language identifier for syntax highlighting. Values
+            outside the accepted identifier charset are dropped rather than
+            emitted, so an untrusted language cannot break out of the fence.
 
     Returns:
         Properly fenced code block string
@@ -46,8 +54,11 @@ def create_code_block(content: str, language: Optional[str] = None) -> str:
     fence_length = determine_fence_length(content)
     fence = "`" * fence_length
 
-    # Add language identifier if provided
-    language_tag = language if language else ""
+    # Add language identifier only when it is a recognisable tag
+    candidate_tag = language or ""
+    language_tag = (
+        candidate_tag if LANGUAGE_TAG_PATTERN.fullmatch(candidate_tag) else ""
+    )
 
     # Ensure content ends with newline for proper block formatting
     if content and not content.endswith("\n"):

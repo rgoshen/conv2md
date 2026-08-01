@@ -129,6 +129,76 @@ class TestMarkdownBlocks(unittest.TestCase):
         self.assertEqual(result, expected)
 
 
+class TestCodeBlockLanguageValidation(unittest.TestCase):
+    """Test that fence language tags cannot escape the code block."""
+
+    def test_accepts_ordinary_language_tags(self):
+        """Real-world language identifiers pass through unchanged."""
+        languages = [
+            "python",
+            "c++",
+            "objective-c",
+            "f#",
+            "C",
+            "jsonl",
+            "shell_session",
+            "vim.script",
+            "a" * 32,  # Longest accepted tag
+        ]
+
+        for language in languages:
+            with self.subTest(language=language):
+                result = create_code_block("code", language=language)
+                self.assertEqual(result, f"```{language}\ncode\n```")
+
+    def test_fence_closing_language_cannot_inject_markdown(self):
+        """A language that closes its own fence must not escape the block."""
+        malicious = "python\n```\n# FORGED HEADING\n\nnot code anymore"
+
+        result = create_code_block("print('hi')", language=malicious)
+
+        # The forged heading must never reach the output at all
+        self.assertNotIn("FORGED HEADING", result)
+        # Exactly one opening and one closing fence, and the opener is bare
+        self.assertEqual(result.count("```"), 2)
+        self.assertEqual(result.splitlines()[0], "```")
+        self.assertEqual(result, "```\nprint('hi')\n```")
+
+    def test_rejects_invalid_language_tags(self):
+        """Tags outside the identifier charset fall back to an empty tag."""
+        cases = [
+            ("newline", "python\nnot-code"),
+            ("carriage return", "python\r```"),
+            ("fence characters", "```python"),
+            ("space", "python script"),
+            ("tab", "python\tscript"),
+            ("html", "<script>alert(1)</script>"),
+            ("path traversal", "../../etc/passwd"),
+            ("too long", "a" * 33),
+            ("empty string", ""),
+            ("whitespace only", "   "),
+        ]
+
+        for description, language in cases:
+            with self.subTest(case=description):
+                result = create_code_block("code", language=language)
+                self.assertEqual(result, "```\ncode\n```")
+
+    def test_none_language_produces_bare_fence(self):
+        """Omitting the language keeps the existing bare-fence behaviour."""
+        self.assertEqual(create_code_block("code"), "```\ncode\n```")
+        self.assertEqual(create_code_block("code", language=None), "```\ncode\n```")
+
+    def test_language_validation_respects_extended_fences(self):
+        """Fence extension and language validation compose correctly."""
+        content = "```bash\necho 'test'\n```"
+
+        result = create_code_block(content, language="markdown\n```\n# FORGED")
+
+        self.assertEqual(result, f"````\n{content}\n````")
+        self.assertNotIn("FORGED", result)
+
+
 class TestDeterministicOutput(unittest.TestCase):
     """Test deterministic output across multiple runs."""
 
