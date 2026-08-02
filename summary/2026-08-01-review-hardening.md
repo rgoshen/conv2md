@@ -39,10 +39,11 @@ the reject-vs-truncate distinction, and four documentation corrections.
   the second replace maps an orphaned `\r` to the same `\n` the intact pair would
   have produced. A sweep of every cut offset from -4 to +4 found no offset
   leaving a stray `\r`. Documented the invariant and added a regression test.
-- "Fix the code span around `: ` to remove edge whitespace." Not a defect:
-  CommonMark strips a space from each side only when the content both begins and
-  ends with a space. The content begins with a colon, so it already renders
-  correctly; the suggested change would have introduced a bug.
+- "Fix the code span containing a colon followed by a space, to remove edge
+  whitespace." Not a defect: CommonMark strips a space from each side only when
+  the content both begins and ends with a space. That content begins with a
+  colon, so it already renders correctly; the suggested change would have
+  introduced a bug.
 
 **Verification:**
 - 137 tests pass (was 108 on develop) — 29 added
