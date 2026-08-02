@@ -19,8 +19,9 @@ class ConversionStatus(Enum):
 class ConversionMetrics:
     """Metrics collected during markdown conversion."""
 
-    # Timing metrics
-    start_time: float = field(default_factory=time.time)
+    # Timing metrics. Monotonic clock readings, not wall-clock timestamps: an
+    # NTP step or DST change must not corrupt duration or processing rate.
+    start_time: float = field(default_factory=time.monotonic)
     end_time: Optional[float] = None
     duration_seconds: Optional[float] = None
 
@@ -41,11 +42,10 @@ class ConversionMetrics:
 
     # Performance metrics
     processing_rate_chars_per_sec: Optional[float] = None
-    memory_peak_mb: Optional[float] = None
 
     def finish(self) -> None:
         """Mark the conversion as finished and calculate final metrics."""
-        self.end_time = time.time()
+        self.end_time = time.monotonic()
         self.duration_seconds = self.end_time - self.start_time
 
         if self.duration_seconds > 0 and self.total_content_size > 0:
@@ -67,7 +67,6 @@ class ConversionMetrics:
             "warnings_issued": self.warnings_issued,
             "status": self.status.value,
             "processing_rate_chars_per_sec": self.processing_rate_chars_per_sec,
-            "memory_peak_mb": self.memory_peak_mb,
         }
 
 
@@ -127,8 +126,6 @@ class MetricsCollector:
         self.current_metrics.output_size = output_size
         self.current_metrics.finish()
 
-        # Log final metrics
-        metrics_dict = self.current_metrics.to_dict()
-        self.logger.info(f"Conversion completed: {metrics_dict}")
-
+        # Caller owns reporting; MarkdownGenerator.generate logs the returned
+        # metrics, so logging them here would duplicate every entry.
         return self.current_metrics

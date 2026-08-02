@@ -36,9 +36,9 @@ The conv2md markdown generation engine produces clean, deterministic markdown fr
 ```
 
 ### YAML Frontmatter
-When metadata is provided, the document begins with YAML frontmatter. Every
-value is emitted as a **double-quoted YAML scalar**, including numbers and
-collections, which are stringified first:
+When non-empty metadata is provided, the document begins with YAML frontmatter.
+Every value is emitted as a **double-quoted YAML scalar**, including numbers
+and collections, which are stringified first:
 
 ```yaml
 ---
@@ -83,7 +83,14 @@ Input `Hello *world* with _emphasis_!` is emitted escaped:
 Hello \*world\* with \_emphasis\_\!
 ```
 
-- Markdown special characters escaped: `` \ ` * _ { } [ ] ( ) # + - . ! | ``
+- Markdown special characters escaped: `` \ ` * _ { } [ ] ( ) # + - . ! | = > ``
+- `\` is escaped first, so the escapes added for the rest cannot be
+  double-escaped or defeated by a caller-supplied backslash
+- `=` and `>` are escaped because they are block-level openers ordinary content
+  can spell by accident: `===` on the line under text makes a setext heading,
+  and a leading `>` makes a blockquote. (`---`, the setext level-2 form, is
+  already covered by the `-` escape.) Both are ASCII punctuation, so the
+  backslash escape renders them as the literal characters the author wrote
 - Content appears on line following speaker line
 - Preserves original line breaks and formatting
 
@@ -100,7 +107,7 @@ def hello():
 - Automatic fence length determination
 - Handles nested backticks by extending fence length
 - Language specification support, restricted to the tag charset
-  `[A-Za-z0-9_+#.-]` with a 32 character cap. The language is interpolated into
+  `[A-Za-z0-9_+#.-]` with a 32-character cap. The language is interpolated into
   the opening fence, so a value outside that charset — one containing a newline
   or backticks, for example — could close its own fence and inject Markdown
   that renders outside the code block. Rejected values fall back to a bare
@@ -180,7 +187,7 @@ def hello():
 - Individual message content checked before processing
 
 ### Total Conversation Limits
-- Total size: 100MB after sanitization
+- Total size: 100MB, measured from the raw UTF-8 content before sanitization
 - Cumulative across all messages in conversation
 
 ### Metadata Limits
@@ -265,7 +272,7 @@ The generation uses a pluggable pipeline architecture:
 
 ### Compatibility
 - Follows GitHub Flavored Markdown specification
-- Compatible with standard markdown parsers
+- Compatible with standard Markdown parsers
 - YAML frontmatter follows Jekyll/Hugo conventions
 
 ## Examples

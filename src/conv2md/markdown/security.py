@@ -3,7 +3,7 @@
 import logging
 import re
 from datetime import datetime
-from typing import Dict, Any
+from typing import Dict, Any, Tuple
 from conv2md.markdown.constants import (
     MAX_METADATA_VALUE_LENGTH,
     MAX_SPEAKER_NAME_LENGTH,
@@ -18,9 +18,34 @@ logger = logging.getLogger(__name__)
 # are escaped rather than dropped.
 CONTROL_CHARACTERS = re.compile(r"[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]")
 
+# Speaker names and timestamps are single-line fields, so newline, carriage
+# return and tab carry no meaning there either: the whole C0 range plus DEL is
+# dropped rather than escaped.
+SINGLE_LINE_CONTROL_CHARACTERS = re.compile(r"[\x00-\x1F\x7F]")
+
 # Calendar date with bounded month and day fields. Field bounds alone cannot
 # reject dates such as 2024-02-30, so callers also confirm with the calendar.
 _DATE_PATTERN = r"\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])"
+
+# Timestamp shapes accepted by validate_timestamp, compiled once at import:
+# the validator runs per message, so rebuilding these per call is pure overhead.
+# ISO8601 (2024-08-18T14:30:00Z, 2024-08-18T14:30:00+00:00, 2024-08-18)
+_ISO8601_PATTERN = re.compile(
+    rf"^{_DATE_PATTERN}(?:T(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d"
+    r"(?:\.\d+)?(?:[+-]\d{2}:\d{2}|Z)?)?$"
+)
+# Human readable with spaces (2024-08-18 14:30:00)
+_HUMAN_READABLE_PATTERN = re.compile(
+    rf"^{_DATE_PATTERN}\s+(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d$"
+)
+# Time only, 24-hour: 00-23:00-59:00-59 (14:30:00, 14:30, 02:30:45)
+_TIME_24H_PATTERN = re.compile(r"^(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$")
+# Time only, 12-hour: 01-12:00-59 AM/PM (2:30 PM)
+_TIME_12H_PATTERN = re.compile(
+    r"^(?:0?[1-9]|1[0-2]):[0-5]\d(?::[0-5]\d)?\s*[APap][Mm]$"
+)
+# Unix timestamp (1692364200, 1692364200.123)
+_UNIX_PATTERN = re.compile(r"^\d{10}(?:\.\d{1,6})?$")
 
 
 def sanitize_yaml_metadata(metadata: Dict[str, Any]) -> Dict[str, Any]:
@@ -89,28 +114,34 @@ def sanitize_yaml_value(value: Any) -> str:
     return f'"{str_value}"'
 
 
-def sanitize_content(content: str) -> str:
+def sanitize_content(content: str) -> Tuple[str, bool]:
     """Sanitize content for safe markdown output.
 
     Args:
         content: Raw content string
 
     Returns:
-        Sanitized content safe for markdown
+        A ``(content, truncated)`` pair. ``truncated`` reports whether the input
+        exceeded MAX_CONTENT_SANITIZATION_SIZE and so lost characters. Silently
+        dropping the caller's text would be invisible, so the signal is returned
+        alongside the text rather than left for the caller to recompute.
     """
     if not content:
-        return ""
+        return "", False
 
     # Limit content length to prevent DoS
+    truncated = len(content) > MAX_CONTENT_SANITIZATION_SIZE
     content = content[:MAX_CONTENT_SANITIZATION_SIZE]
 
     # Remove null bytes and other control characters (except newlines and tabs)
     content = CONTROL_CHARACTERS.sub("", content)
 
-    # Normalize line endings
+    # Normalize line endings. A "\r\n" pair split by the cut above cannot leave
+    # a stray "\r" behind: the second replace maps a lone "\r" to the same "\n"
+    # the intact pair would have produced.
     content = content.replace("\r\n", "\n").replace("\r", "\n")
 
-    return content
+    return content, truncated
 
 
 def validate_speaker_name(speaker: str) -> str:
@@ -132,7 +163,7 @@ def validate_speaker_name(speaker: str) -> str:
     speaker = speaker.strip()[:MAX_SPEAKER_NAME_LENGTH]
 
     # Remove control characters
-    speaker = re.sub(r"[\x00-\x1F\x7F]", "", speaker)
+    speaker = SINGLE_LINE_CONTROL_CHARACTERS.sub("", speaker)
 
     if not speaker:
         raise ValueError("Speaker name contains only invalid characters")
@@ -162,36 +193,17 @@ def validate_timestamp(timestamp: str) -> str:
         return ""
 
     # Remove control characters
-    timestamp = re.sub(r"[\x00-\x1F\x7F]", "", timestamp)
-
-    # Improved validation for common timestamp formats
-    # Pattern 1: ISO8601 formats (2024-08-18T14:30:00Z, etc.)
-    iso8601_pattern = (
-        rf"^{_DATE_PATTERN}(?:T(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d"
-        r"(?:\.\d+)?(?:[+-]\d{2}:\d{2}|Z)?)?$"
-    )
-
-    # Pattern 2: Time only formats (14:30:00, 14:30, 2:30 PM, 02:30:45)
-    # 24-hour: 00-23:00-59:00-59, 12-hour: 01-12:00-59 AM/PM
-    time_24h_pattern = r"^(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$"
-    time_12h_pattern = r"^(?:0?[1-9]|1[0-2]):[0-5]\d(?::[0-5]\d)?\s*[APap][Mm]$"
-
-    # Pattern 3: Unix timestamp (1692364200, 1692364200.123)
-    unix_pattern = r"^\d{10}(?:\.\d{1,6})?$"
-
-    # Pattern 4: Human readable with spaces (2024-08-18 14:30:00)
-    human_readable_pattern = rf"^{_DATE_PATTERN}\s+(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d$"
+    timestamp = SINGLE_LINE_CONTROL_CHARACTERS.sub("", timestamp)
 
     has_calendar_date = bool(
-        re.match(iso8601_pattern, timestamp)
-        or re.match(human_readable_pattern, timestamp)
+        _ISO8601_PATTERN.match(timestamp) or _HUMAN_READABLE_PATTERN.match(timestamp)
     )
 
     if not (
         has_calendar_date
-        or re.match(time_24h_pattern, timestamp)
-        or re.match(time_12h_pattern, timestamp)
-        or re.match(unix_pattern, timestamp)
+        or _TIME_24H_PATTERN.match(timestamp)
+        or _TIME_12H_PATTERN.match(timestamp)
+        or _UNIX_PATTERN.match(timestamp)
     ):
         raise ValueError(f"Invalid timestamp format: {timestamp}")
 
